@@ -20,7 +20,7 @@ An unofficial study guide, not affiliated with the course staff.
 | Interpreter | What Lisp is, prefix notation, interpreter vs compiler, Tokenize, Parse, Evaluate, dictionaries for variables and functions, the `pop(0)` shortcut and its fixes, the Fibonacci test |
 | Playground | Type Lisp and run it. Shows the tokens, the parse tree, the output, and every evaluation step with the current scope and call stack. Includes the lecture examples and six "quirk" demos |
 | Python code | `minilisp.py`, a complete interpreter, shown in six annotated sections |
-| Quiz | 14 robotics and 19 interpreter questions with explanations |
+| Quiz | 24 robotics and 34 interpreter questions with explanations |
 | Cheat sheet | Both topics on one page |
 
 ## Files

@@ -86,14 +86,14 @@ with sync_playwright() as p:
 
         # ===== quiz =====
         page.goto(URL + '#quiz'); page.wait_for_timeout(200)
-        check(page.locator('.q').count() == 14, 'robotics quiz has 14 questions')
+        check(page.locator('.q').count() == 24, 'robotics quiz has 24 questions')
         page.locator('.q').first.locator('.opt').first.click()
         check(page.locator('.q').first.locator('.q-why').count() == 1, 'answering shows explanation')
         check('answered' in page.inner_text('#score'), 'score updates')
         page.click('[data-quiz="interp"]')
-        check(page.locator('.q').count() == 19, 'interpreter quiz has 19 questions')
-        # answer all 19, then make sure the final score line appears
-        for i in range(19):
+        check(page.locator('.q').count() == 34, 'interpreter quiz has 34 questions')
+        # answer all 34, then make sure the final score line appears
+        for i in range(34):
             page.locator('.q').nth(i).locator('.opt').first.click()
         check(page.inner_text('#score').startswith('Done:'), 'finishing a quiz shows the final score')
         page.screenshot(path=os.path.join(SHOTS, f'{tag}-quiz-answered.png'))
