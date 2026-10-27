@@ -1,0 +1,1848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Robots &amp; Interpreters</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Learn the CMU 15-112 advanced topics on robotics and writing a Lisp interpreter, with a live interpreter playground, quizzes and a cheat sheet.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout concept: a lab notebook. Lessons read as a narrow column of prose with
+   diagrams that break wider; the playground is a full width workbench where the
+   one bold color (signal amber) always marks "what the machine is doing right now". */
+:root {
+  --bg: #F2F4F8;
+  --surface: #FFFFFF;
+  --sunken: #E8ECF3;
+  --ink: #141824;
+  --muted: #586074;
+  --line: #D5DBE6;
+  --accent: #2440C9;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E2E7FA;
+  --hot: #B65A00;
+  --hot-soft: #FCEAD4;
+  --ok: #1D7446;
+  --ok-soft: #DDF2E6;
+  --bad: #B42318;
+  --bad-soft: #FBE3E0;
+  --code-bg: #121726;
+  --code-fg: #E4E8F2;
+  --code-dim: #8C95AB;
+  --code-kw: #9DB1FF;
+  --code-str: #F5C27A;
+  --code-num: #8FE0B8;
+  --code-com: #7B859C;
+  --code-fn: #F59BC4;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 8px;
+  --gutter-l: max(16px, env(safe-area-inset-left, 0px));
+  --gutter-r: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C0F16; --surface: #141925; --sunken: #1A2030; --ink: #E6E9F1; --muted: #9AA3B6;
+    --line: #283044; --accent: #93A6FF; --accent-ink: #0C0F16; --accent-soft: #1C2550;
+    --hot: #F4A84C; --hot-soft: #3A2A15; --ok: #62CC92; --ok-soft: #133024; --bad: #FF8073; --bad-soft: #3D1B18;
+    --code-bg: #0A0D15; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C0F16; --surface: #141925; --sunken: #1A2030; --ink: #E6E9F1; --muted: #9AA3B6;
+  --line: #283044; --accent: #93A6FF; --accent-ink: #0C0F16; --accent-soft: #1C2550;
+  --hot: #F4A84C; --hot-soft: #3A2A15; --ok: #62CC92; --ok-soft: #133024; --bad: #FF8073; --bad-soft: #3D1B18;
+  --code-bg: #0A0D15; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.6 var(--font-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.15; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 800; letter-spacing: -0.025em; }
+h2 { font-size: clamp(1.55rem, 3.4vw, 2.1rem); font-weight: 700; }
+h3 { font-size: 1.25rem; font-weight: 700; }
+h4 { font-size: 1.02rem; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--accent); text-underline-offset: 2px; }
+code, kbd, pre { font-family: var(--font-mono); }
+:not(pre) > code { font-size: 0.88em; background: var(--sunken); padding: 0.08em 0.35em; border-radius: 4px; white-space: nowrap; }
+button, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eyebrow { font: 600 0.74rem/1.2 var(--font-mono); letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+.mono { font-family: var(--font-mono); }
+
+/* ===== header ===== */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top-inner { max-width: 1240px; margin: 0 auto; padding-left: var(--gutter-l); padding-right: var(--gutter-r); display: flex; align-items: center; gap: 20px; min-height: 58px; }
+.brand { display: flex; flex-direction: column; text-decoration: none; color: var(--ink); flex: none; }
+.brand b { font: 800 1.08rem/1.1 var(--font-display); letter-spacing: -0.01em; }
+.brand span { font: 500 0.68rem/1.3 var(--font-mono); color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.nav { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; padding-block: 8px; }
+.nav::-webkit-scrollbar { display: none; }
+.nav a { flex: none; text-decoration: none; color: var(--muted); font-weight: 500; font-size: 0.92rem; padding: 6px 11px; border-radius: 6px; white-space: nowrap; }
+.nav a:hover { color: var(--ink); background: var(--sunken); }
+.nav a[aria-current="page"] { color: var(--accent-ink); background: var(--accent); }
+@media (max-width: 720px) {
+  .top-inner { flex-direction: column; align-items: stretch; gap: 0; padding-top: 8px; }
+  .brand { flex-direction: row; align-items: baseline; gap: 10px; }
+}
+
+/* ===== page frame ===== */
+main { max-width: 1240px; margin: 0 auto; padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-block: 36px 80px; }
+.view { display: grid; gap: 48px; }
+.page-head { display: grid; gap: 14px; max-width: 760px; }
+.page-head .lede { font-size: 1.15rem; color: var(--muted); max-width: 64ch; }
+.lesson { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: 48px; align-items: start; }
+.lesson-body { display: grid; gap: 56px; min-width: 0; }
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 80px); display: grid; gap: 6px; font-size: 0.9rem; }
+.toc button { all: unset; cursor: pointer; color: var(--muted); padding: 3px 0; }
+.toc button:hover { color: var(--accent); }
+.toc button:focus-visible { outline: 2px solid var(--accent); }
+@media (max-width: 960px) { .lesson { grid-template-columns: minmax(0, 1fr); } .toc { display: none; } }
+
+section.topic { display: grid; gap: 18px; }
+.topic-num { font: 600 0.8rem/1 var(--font-mono); color: var(--accent); letter-spacing: 0.06em; }
+.prose { display: grid; gap: 14px; max-width: 68ch; }
+.prose ul, .prose ol { margin: 0; padding-left: 1.25em; display: grid; gap: 6px; }
+.prose li::marker { color: var(--muted); }
+.defs { display: grid; gap: 10px; margin: 0; max-width: 68ch; }
+.defs div { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 16px; padding: 12px 0; border-top: 1px solid var(--line); }
+.defs dt { font-weight: 600; }
+.defs dd { margin: 0; color: var(--ink); }
+@media (max-width: 600px) { .defs div { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+
+.note { display: grid; gap: 6px; padding: 14px 16px; border-radius: var(--radius); background: var(--accent-soft); max-width: 68ch; }
+.note.exam { background: var(--hot-soft); }
+.note.exam .eyebrow { color: var(--hot); }
+.note .eyebrow { color: var(--accent); }
+.note.warn { background: var(--bad-soft); }
+.note.warn .eyebrow { color: var(--bad); }
+
+figure { margin: 0; display: grid; gap: 8px; }
+figcaption { font-size: 0.88rem; color: var(--muted); max-width: 68ch; }
+.diagram { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.diagram svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.d-box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.d-box.a { fill: var(--accent-soft); stroke: var(--accent); }
+.d-box.h { fill: var(--hot-soft); stroke: var(--hot); }
+.d-t { fill: var(--ink); font: 700 17px var(--font-display); }
+.d-s { fill: var(--muted); font: 400 13px var(--font-body); }
+.d-m { fill: var(--accent); font: 500 12.5px var(--font-mono); }
+.d-mh { fill: var(--hot); font: 600 12.5px var(--font-mono); }
+.d-line { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+.d-line.h { stroke: var(--hot); }
+.d-arrow { fill: var(--muted); }
+.d-arrow.h { fill: var(--hot); }
+.d-foot { fill: var(--sunken); stroke: var(--ink); stroke-width: 1.5; }
+.d-poly { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.d-dot { fill: var(--hot); }
+.d-spring { stroke: var(--hot); stroke-width: 2.4; fill: none; stroke-linejoin: round; }
+
+table.grid { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+.table-wrap { overflow-x: auto; max-width: 100%; }
+table.grid th, table.grid td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+table.grid th { font: 600 0.76rem/1.2 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+table.grid td:first-child { font-weight: 600; }
+
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; max-width: 72ch; }
+.timeline li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; padding: 14px 0; border-top: 1px solid var(--line); }
+.timeline .when { font: 600 0.85rem/1.4 var(--font-mono); color: var(--hot); }
+.timeline h4 { margin-bottom: 4px; }
+@media (max-width: 600px) { .timeline li { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+
+pre.block { margin: 0; background: var(--code-bg); color: var(--code-fg); padding: 14px 16px; border-radius: var(--radius); overflow-x: auto; font-size: 0.88rem; line-height: 1.55; max-width: 100%; }
+pre.block .c { color: var(--code-com); }
+
+.links { display: grid; gap: 10px; max-width: 68ch; padding: 0; margin: 0; list-style: none; }
+.links li { display: grid; gap: 2px; padding: 10px 0; border-top: 1px solid var(--line); }
+
+/* ===== start view ===== */
+.hero { display: grid; gap: 22px; padding-top: 8px; }
+.hero h1 span { color: var(--accent); }
+.hero .lede { font-size: 1.2rem; max-width: 60ch; color: var(--muted); }
+.pipeline { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; }
+.pipe-stage { display: grid; gap: 8px; align-content: start; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; min-width: 0; flex: 1 1 180px; }
+.pipe-stage.final { background: var(--hot-soft); border-color: var(--hot); }
+.pipe-stage .eyebrow { display: flex; justify-content: space-between; gap: 8px; }
+.pipe-arrow { align-self: center; color: var(--muted); font: 600 1.3rem var(--font-mono); }
+@media (max-width: 760px) { .pipe-arrow { display: none; } }
+.pipe-stage pre { margin: 0; font-size: 0.82rem; white-space: pre-wrap; word-break: break-word; }
+.big-value { font: 800 2.6rem/1 var(--font-display); color: var(--hot); }
+.paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 16px; }
+.path-card { display: grid; gap: 10px; align-content: start; padding: 20px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+.path-card:hover { border-color: var(--accent); }
+.path-card h3 { color: var(--ink); }
+.path-card .go { color: var(--accent); font-weight: 600; font-size: 0.92rem; }
+.route { list-style: none; counter-reset: r; padding: 0; margin: 0; display: grid; gap: 0; max-width: 760px; }
+.route li { counter-increment: r; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: baseline; padding: 12px 0; border-top: 1px solid var(--line); }
+.route li::before { content: counter(r, decimal-leading-zero); font: 600 0.85rem var(--font-mono); color: var(--muted); }
+.route .t { font-size: 0.85rem; color: var(--muted); font-family: var(--font-mono); }
+.route a { font-weight: 600; text-decoration: none; }
+
+/* ===== tokens (shared by lesson and playground) ===== */
+.tokens { display: flex; flex-wrap: wrap; gap: 5px; font-family: var(--font-mono); font-size: 0.86rem; }
+.tok { display: inline-flex; align-items: center; min-width: 26px; justify-content: center; padding: 2px 7px; border-radius: 5px; border: 1px solid var(--line); background: var(--surface); }
+.tok.paren { color: var(--muted); }
+.tok.num { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); background: var(--ok-soft); }
+.tok.name { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); background: var(--accent-soft); }
+.tok.op { color: var(--ink); font-weight: 600; }
+.tok.eof { color: var(--hot); border-style: dashed; border-color: var(--hot); font-size: 0.72rem; letter-spacing: 0.05em; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.82rem; color: var(--muted); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+
+/* ===== parse tree ===== */
+.tree { font-family: var(--font-mono); font-size: 0.86rem; line-height: 1.35; }
+.tree ul { list-style: none; margin: 0; padding-left: 20px; border-left: 1px solid var(--line); margin-left: 10px; }
+.tree > ul { border-left: 0; padding-left: 0; margin-left: 0; }
+.tree li { position: relative; padding: 2px 0; }
+.tree ul ul > li::before { content: ""; position: absolute; left: -20px; top: 15px; width: 16px; border-top: 1px solid var(--line); }
+.tn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; border: 1px solid transparent; max-width: 100%; flex-wrap: wrap; }
+.tn .k { font-weight: 600; }
+.tn .lp { color: var(--muted); }
+.tn.list { background: var(--sunken); }
+.tn.num .k { color: var(--ok); }
+.tn.name .k { color: var(--accent); }
+.tn .role { font: 500 0.68rem/1 var(--font-body); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.tn .val { font-weight: 600; color: var(--hot); }
+.tn.running { border-color: color-mix(in srgb, var(--hot) 45%, transparent); }
+.tn.current { background: var(--hot); border-color: var(--hot); color: var(--bg); }
+.tn.current .k, .tn.current .lp, .tn.current .role, .tn.current .val { color: var(--bg); }
+
+/* ===== playground ===== */
+.pg { display: grid; gap: 18px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); display: grid; align-content: start; min-width: 0; }
+.panel-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.panel-h h3 { font-size: 1.02rem; display: flex; align-items: baseline; gap: 10px; }
+.panel-h h3 .step-n { font: 600 0.72rem var(--font-mono); color: var(--accent-ink); background: var(--accent); padding: 3px 7px; border-radius: 4px; }
+.panel-b { padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.pg-top { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; }
+.pg-eval { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; }
+@media (max-width: 900px) { .pg-top, .pg-eval { grid-template-columns: minmax(0, 1fr); } }
+.ex-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+select, .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 6px 10px; font-size: 0.9rem; }
+select { max-width: 100%; }
+.btn { cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.primary:hover { color: var(--accent-ink); filter: brightness(1.08); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.icon { padding: 6px 9px; font-family: var(--font-mono); }
+textarea#code { width: 100%; min-height: 300px; resize: vertical; background: var(--code-bg); color: var(--code-fg); border: 0; border-radius: 6px; padding: 12px 14px; font: 0.9rem/1.55 var(--font-mono); tab-size: 4; }
+.ex-desc { font-size: 0.9rem; color: var(--muted); }
+.hint { font-size: 0.8rem; color: var(--muted); }
+.out-lines { margin: 0; background: var(--code-bg); color: var(--code-fg); border-radius: 6px; padding: 10px 12px; font: 0.86rem/1.55 var(--font-mono); max-height: 220px; overflow: auto; white-space: pre; }
+.result-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.result-line .big-value { font-size: 2rem; }
+.err { background: var(--bad-soft); color: var(--ink); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; }
+.err .eyebrow { color: var(--bad); }
+.kv { font: 0.82rem/1.5 var(--font-mono); white-space: pre-wrap; word-break: break-word; background: var(--sunken); border-radius: 6px; padding: 8px 10px; margin: 0; }
+.tree-box { max-height: 560px; overflow: auto; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { all: unset; cursor: pointer; padding: 4px 10px; font-size: 0.82rem; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.stepper { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.stepper input[type=range] { flex: 1 1 160px; accent-color: var(--hot); min-width: 0; }
+.step-count { font: 500 0.8rem var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.now { display: grid; gap: 6px; padding: 12px 14px; border-radius: 6px; background: var(--hot-soft); min-height: 92px; align-content: start; }
+.now .badge { justify-self: start; font: 600 0.68rem/1 var(--font-mono); letter-spacing: 0.08em; padding: 4px 7px; border-radius: 4px; background: var(--hot); color: var(--bg); }
+.now .what { font-size: 1.02rem; font-weight: 500; overflow-wrap: anywhere; }
+.now .what code { white-space: normal; background: color-mix(in srgb, var(--surface) 70%, transparent); }
+.scope-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 520px) { .scope-grid { grid-template-columns: minmax(0, 1fr); } }
+.stack { display: flex; flex-direction: column-reverse; gap: 4px; font: 0.8rem var(--font-mono); }
+.stack span { padding: 4px 8px; border-radius: 5px; background: var(--sunken); overflow-wrap: anywhere; }
+.stack span:first-child { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.vars { width: 100%; border-collapse: collapse; font: 0.82rem var(--font-mono); }
+.vars td { padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.vars td:last-child { text-align: right; font-variant-numeric: tabular-nums; color: var(--hot); font-weight: 600; }
+.log { list-style: none; margin: 0; padding: 0; font: 0.8rem/1.45 var(--font-mono); max-height: 260px; overflow: auto; border-top: 1px solid var(--line); }
+.log li { padding: 3px 6px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.log li.cur { background: var(--hot-soft); }
+.log .m { color: var(--muted); }
+.log .v { color: var(--hot); font-weight: 600; }
+.quirks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.quirk { padding: 14px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); display: grid; gap: 6px; align-content: start; }
+.quirk button { justify-self: start; }
+
+/* ===== code walkthrough ===== */
+.walk { display: grid; gap: 28px; }
+.walk-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 960px) { .walk-row { grid-template-columns: minmax(0, 1fr); } }
+.py { margin: 0; background: var(--code-bg); color: var(--code-fg); border-radius: var(--radius); padding: 12px 0; overflow-x: auto; font: 0.83rem/1.6 var(--font-mono); }
+.py .ln { display: block; padding: 0 16px 0 0; white-space: pre; }
+.py .ln::before { content: attr(data-n); display: inline-block; width: 3.2em; padding-right: 1em; text-align: right; color: var(--code-dim); user-select: none; }
+.py .kw { color: var(--code-kw); }
+.py .st { color: var(--code-str); }
+.py .nu { color: var(--code-num); }
+.py .co { color: var(--code-com); font-style: italic; }
+.py .fn { color: var(--code-fn); }
+.py .bi { color: var(--code-kw); opacity: 0.85; }
+.walk-notes { display: grid; gap: 12px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 80px); }
+@media (max-width: 960px) { .walk-notes { position: static; } }
+.walk-notes ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+
+/* ===== quiz ===== */
+.quiz-head { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; }
+.score { font: 600 0.95rem var(--font-mono); font-variant-numeric: tabular-nums; }
+.qlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: q; }
+.q { counter-increment: q; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; }
+.q-prompt { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; font-weight: 600; }
+.q-prompt::before { content: counter(q); font: 600 0.8rem/1.9 var(--font-mono); color: var(--muted); min-width: 1.6em; }
+.q-opts { display: grid; gap: 8px; }
+.opt { all: unset; box-sizing: border-box; cursor: pointer; border: 1px solid var(--line); border-radius: 6px; padding: 9px 12px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.opt:hover { border-color: var(--accent); }
+.opt:focus-visible { outline: 2px solid var(--accent); }
+.opt .l { font: 600 0.8rem var(--font-mono); color: var(--muted); }
+.opt[disabled] { cursor: default; }
+.opt[disabled]:hover { border-color: var(--line); }
+.opt.right { background: var(--ok-soft); border-color: var(--ok); }
+.opt.wrong { background: var(--bad-soft); border-color: var(--bad); }
+.q-why { display: grid; gap: 4px; font-size: 0.94rem; padding: 10px 12px; border-radius: 6px; background: var(--sunken); }
+.q-why b { font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.05em; }
+.q-why b.ok { color: var(--ok); }
+.q-why b.no { color: var(--bad); }
+
+/* ===== cheat sheet ===== */
+.cheat { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; align-items: start; }
+.cheat-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; display: grid; gap: 12px; min-width: 0; }
+.cheat-card h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.cheat-card ul { margin: 0; padding-left: 1.1em; display: grid; gap: 5px; font-size: 0.94rem; }
+.cheat-card pre { margin: 0; font-size: 0.8rem; background: var(--sunken); padding: 10px; border-radius: 6px; overflow-x: auto; }
+@media (max-width: 420px) { .cheat { grid-template-columns: minmax(0, 1fr); } }
+
+footer { max-width: 1240px; margin: 0 auto; padding-left: var(--gutter-l); padding-right: var(--gutter-r); padding-block: 0 48px; color: var(--muted); font-size: 0.85rem; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; } }
+</style>
+
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="#start"><span>15-112 advanced topics</span><b>Robots &amp; Interpreters</b></a>
+    <nav class="nav" aria-label="Sections">
+      <a href="#start">Start</a>
+      <a href="#robotics">Robotics</a>
+      <a href="#interpreter">Interpreter</a>
+      <a href="#playground">Playground</a>
+      <a href="#code">Python code</a>
+      <a href="#quiz">Quiz</a>
+      <a href="#cheatsheet">Cheat sheet</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<!-- ======================================================= START -->
+<div class="view" id="view-start">
+  <div class="hero">
+    <span class="eyebrow">CMU 15-112, Fall 2026 &middot; Advanced topics</span>
+    <h1>How robots move, and how <span>code runs code</span>.</h1>
+    <p class="lede">A from scratch guide to the two advanced topic lectures: Robotics, and Writing an Interpreter for Lisp. Every idea from the official notes is explained here, then you get to run a real interpreter and watch it think.</p>
+    <div class="pipeline" aria-label="The interpreter pipeline in one picture">
+      <div class="pipe-stage"><span class="eyebrow"><span>Code</span><span>a string</span></span><pre class="mono">(+ 1 (* 2 3))</pre></div>
+      <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+      <div class="pipe-stage"><span class="eyebrow"><span>1 Tokenize</span><span>1D list</span></span><div class="tokens" id="hero-tokens"></div></div>
+      <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+      <div class="pipe-stage"><span class="eyebrow"><span>2 Parse</span><span>tree</span></span><pre class="mono">['+', 1,
+    ['*', 2, 3]]</pre></div>
+      <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+      <div class="pipe-stage final"><span class="eyebrow"><span>3 Evaluate</span><span>value</span></span><span class="big-value">7</span></div>
+    </div>
+  </div>
+
+  <div class="note exam">
+    <span class="eyebrow">What the course expects</span>
+    <p>Advanced topics are not in CS Academy, but they are required and can show up on any future quiz or exam. You are only expected to understand what the lecture notes cover. For the Lisp topic, the notes also say you are not responsible for the actual interpreter code. This site follows that line: the lessons cover every point in the notes, and anything extra is clearly marked as optional.</p>
+  </div>
+
+  <div class="paths">
+    <a class="path-card" href="#robotics">
+      <span class="eyebrow">Topic 1</span>
+      <h3>Robotics</h3>
+      <p class="muted">The Sense, Think, Act loop, position control versus force control, the hardware that makes force control work, and what has held robots back.</p>
+      <span class="go">Start the lesson &rarr;</span>
+    </a>
+    <a class="path-card" href="#interpreter">
+      <span class="eyebrow">Topic 2</span>
+      <h3>Writing a Lisp interpreter</h3>
+      <p class="muted">What Lisp is, prefix notation, and the three steps every interpreter in lecture follows: tokenize, parse, evaluate.</p>
+      <span class="go">Start the lesson &rarr;</span>
+    </a>
+  </div>
+
+  <div class="prose">
+    <h2>Suggested route</h2>
+    <p class="muted">Each step builds on the one before it. About an hour end to end.</p>
+  </div>
+  <ol class="route">
+    <li><a href="#robotics">Read the Robotics lesson</a><span class="t">15 min</span></li>
+    <li><a href="#interpreter">Read the Interpreter lesson</a><span class="t">20 min</span></li>
+    <li><a href="#playground">Run programs in the Playground and step through them</a><span class="t">15 min</span></li>
+    <li><a href="#code">Skim the annotated Python code (optional, not on the exam)</a><span class="t">10 min</span></li>
+    <li><a href="#quiz">Take both quizzes</a><span class="t">10 min</span></li>
+    <li><a href="#cheatsheet">Review the cheat sheet the night before</a><span class="t">5 min</span></li>
+  </ol>
+</div>
+
+<!-- ======================================================= ROBOTICS -->
+<div class="view" id="view-robotics" hidden>
+  <div class="page-head">
+    <span class="eyebrow">Topic 1 of 2</span>
+    <h1>Robotics</h1>
+    <p class="lede">Four ideas: how a robot's brain is organized, two ways to control its motors, the hardware behind the better way, and the problems that kept robots clumsy for decades.</p>
+  </div>
+  <div class="lesson">
+    <div class="lesson-body">
+
+      <section class="topic" id="r-sta">
+        <span class="topic-num">1 &middot; THE CORE LOOP</span>
+        <h2>Sense, Think, Act</h2>
+        <div class="prose">
+          <p>Almost every robot runs the same three part loop, over and over, many times per second. This way of organizing a robot is called the <b>Sense, Think, Act paradigm</b>.</p>
+        </div>
+        <figure>
+          <div class="diagram">
+            <svg viewBox="0 0 720 250" role="img" aria-label="Sense leads to Think leads to Act, and Act loops back to Sense through the world">
+              <defs>
+                <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker>
+                <marker id="ahh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path class="d-arrow h" d="M0,0 L10,5 L0,10 z"/></marker>
+              </defs>
+              <rect class="d-box a" x="20" y="24" width="190" height="112" rx="8"/>
+              <text class="d-t" x="38" y="56">Sense</text>
+              <text class="d-s" x="38" y="80">Read new information</text>
+              <text class="d-s" x="38" y="98">from sensors</text>
+              <text class="d-m" x="38" y="124">&#8776; updating the model</text>
+              <rect class="d-box a" x="265" y="24" width="190" height="112" rx="8"/>
+              <text class="d-t" x="283" y="56">Think</text>
+              <text class="d-s" x="283" y="80">Draw conclusions,</text>
+              <text class="d-s" x="283" y="98">estimate, plan</text>
+              <text class="d-m" x="283" y="124">&#8776; the controller</text>
+              <rect class="d-box a" x="510" y="24" width="190" height="112" rx="8"/>
+              <text class="d-t" x="528" y="56">Act</text>
+              <text class="d-s" x="528" y="80">Move motors, send</text>
+              <text class="d-s" x="528" y="98">messages, other outputs</text>
+              <text class="d-m" x="528" y="124">&#8776; the view</text>
+              <line class="d-line" x1="212" y1="80" x2="261" y2="80" marker-end="url(#ah)"/>
+              <line class="d-line" x1="457" y1="80" x2="506" y2="80" marker-end="url(#ah)"/>
+              <path class="d-line h" d="M605,138 L605,200 L115,200 L115,140" marker-end="url(#ahh)"/>
+              <text class="d-mh" x="360" y="226" text-anchor="middle">the world changes, so sense again (repeat forever)</text>
+            </svg>
+          </div>
+          <figcaption>The loop. The blue labels show the MVC analogy from the notes. The analogy is loose, so treat it as a memory aid, not an exact match.</figcaption>
+        </figure>
+        <dl class="defs">
+          <div><dt>Sense</dt><dd>Gather any new information. The notes list three kinds: the <b>environment</b> (cameras, distance sensors, touch sensors), the <b>robot's own state</b> (joint angles, speed, battery level), and <b>external commands</b> (a person's joystick, a message from another computer).</dd></div>
+          <div><dt>Think</dt><dd>Use that information to draw conclusions or make estimates, then <b>plan an action</b>. Example: "the wall is 20 cm ahead and I am moving fast, so I should turn left now."</dd></div>
+          <div><dt>Act</dt><dd>Carry out the plan by <b>moving motors</b>, <b>sending messages</b>, or controlling other outputs such as lights or a speaker.</dd></div>
+        </dl>
+        <div class="prose">
+          <h3>Why the notes compare it to MVC</h3>
+          <p>In 15-112 graphics apps you already use Model, View, Controller. The <b>model</b> is the data stored in <code>app</code>. The <b>controller</b> is your event functions, like <code>onKeyPress</code> and <code>onStep</code>, which decide how that data changes. The <b>view</b> is <code>redrawAll</code>, which shows the result.</p>
+          <ul>
+            <li><b>Sense is like updating the model.</b> New sensor readings get stored as the robot's current picture of itself and the world.</li>
+            <li><b>Think is like the controller.</b> It looks at the model and decides what should happen next.</li>
+            <li><b>Act is like the view.</b> It is the visible output. Instead of drawing on a screen, the robot "draws" by moving in the real world.</li>
+          </ul>
+          <p>A quick example: a robot vacuum <b>senses</b> that its bump sensor was pressed, <b>thinks</b> "I hit something, I should back up and turn," and <b>acts</b> by spinning its wheels. Then it senses again.</p>
+        </div>
+      </section>
+
+      <section class="topic" id="r-control">
+        <span class="topic-num">2 &middot; CONTROLLING MOTORS</span>
+        <h2>Position control versus force control</h2>
+        <div class="prose">
+          <p>When a robot moves a joint, there are two very different things you can tell the motor to do.</p>
+        </div>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead><tr><th></th><th>Position control</th><th>Force control</th></tr></thead>
+            <tbody>
+              <tr><td>You command</td><td>Where the joint should be: "go to 45 degrees and stay there."</td><td>How hard the joint should push, or how stiff it should feel.</td></tr>
+              <tr><td>If something is in the way</td><td>It pushes as hard as it needs to reach the target anyway.</td><td>It can feel the contact and give way, like your arm does when someone bumps it.</td></tr>
+              <tr><td>Best for</td><td>Extremely fast, repetitive motion in predictable places, like a factory arm welding the same spot on every car.</td><td>Moving more like a human: reacting to touch and recovering from unexpected collisions.</td></tr>
+              <tr><td>Typical look</td><td>Older walking robots: stable, but slow, stiff and toy like.</td><td>Newer robots that walk, run and catch themselves more naturally.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose">
+          <h3>How older walking robots stayed upright</h3>
+          <p>Older walkers used position control and followed one strict rule: keep the <b>center of mass</b> (or the <b>zero moment point</b>) above the <b>support polygon</b> at all times. Three terms to know:</p>
+        </div>
+        <dl class="defs">
+          <div><dt>Center of mass</dt><dd>The average position of all the robot's mass. It is the point the robot balances around.</dd></div>
+          <div><dt>Support polygon</dt><dd>Look down from above and stretch a rubber band around every part of the robot touching the ground. The shape inside is the support polygon. With both feet down it is large. Mid step, on one foot, it shrinks to just that foot.</dd></div>
+          <div><dt>Zero moment point (ZMP)</dt><dd>The point on the ground where the combined effect of gravity and the robot's motion produces no tipping. It is the moving version of the center of mass idea: if the ZMP stays inside the support polygon, the robot does not tip over.</dd></div>
+        </dl>
+        <figure>
+          <div class="diagram">
+            <svg viewBox="0 0 680 230" role="img" aria-label="Left: two feet with a shaded support polygon and the center of mass inside it. Right: one foot with the center of mass outside, so the robot tips.">
+              <defs>
+                <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path class="d-arrow h" d="M0,0 L10,5 L0,10 z"/></marker>
+              </defs>
+              <text class="d-m" x="40" y="26">TOP VIEW, BOTH FEET DOWN</text>
+              <polygon class="d-poly" points="70,52 120,52 230,64 230,166 180,166 70,154"/>
+              <rect class="d-foot" x="70" y="52" width="50" height="102" rx="18"/>
+              <rect class="d-foot" x="180" y="64" width="50" height="102" rx="18"/>
+              <circle class="d-dot" cx="150" cy="108" r="8"/>
+              <text class="d-s" x="164" y="104">center of mass</text>
+              <text class="d-t" x="40" y="206">Stable</text>
+              <text class="d-s" x="105" y="206">dot inside the polygon</text>
+              <text class="d-m" x="380" y="26">TOP VIEW, ONE FOOT (MID STEP)</text>
+              <polygon class="d-poly" points="420,58 470,58 470,160 420,160"/>
+              <rect class="d-foot" x="420" y="58" width="50" height="102" rx="18"/>
+              <rect class="d-foot" x="540" y="52" width="50" height="102" rx="18" opacity="0.25"/>
+              <circle class="d-dot" cx="515" cy="108" r="8"/>
+              <line class="d-line h" x1="527" y1="108" x2="600" y2="108" marker-end="url(#ah2)" stroke-dasharray="4 4"/>
+              <text class="d-s" x="540" y="186">foot in the air</text>
+              <text class="d-t" x="380" y="206">Tipping</text>
+              <text class="d-s" x="452" y="206">dot outside the polygon</text>
+            </svg>
+          </div>
+          <figcaption>Older walkers never let the dot leave the shaded area. That makes them stable, but it forces slow, careful, stiff steps.</figcaption>
+        </figure>
+
+        <div class="prose">
+          <h3>The hardware that makes force control work</h3>
+          <p>A traditional motor uses lots of gearing to multiply its strength. Heavy gearing adds friction and makes the joint stiff, so the motor cannot easily feel what is pushing back on it. That is a poor fit for force control. The notes name better options:</p>
+          <ul>
+            <li><b>Series elastic actuators.</b> A spring is placed in series (in a chain) between the motor's gearbox and the joint. Measure how far the spring stretches, and you know the force, because for a spring force equals stiffness times stretch (<i>F = k &middot; x</i>, Hooke's law). The spring also absorbs shocks.</li>
+            <li><b>Compliant joints.</b> Joints designed to give a little instead of being perfectly rigid.</li>
+            <li><b>Very high torque direct drive motors with less gearing.</b> This is what many more modern robots use. With little gearing there is less friction, so the motor itself can sense and control force well.</li>
+          </ul>
+        </div>
+        <figure>
+          <div class="diagram">
+            <svg viewBox="0 0 720 180" role="img" aria-label="A series elastic actuator: motor, then gearbox, then a spring, then the joint. Measuring the spring stretch gives the force.">
+              <defs>
+                <marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path class="d-arrow" d="M0,0 L10,5 L0,10 z"/></marker>
+              </defs>
+              <rect class="d-box" x="20" y="54" width="120" height="70" rx="8"/>
+              <text class="d-t" x="80" y="95" text-anchor="middle">Motor</text>
+              <line class="d-line" x1="142" y1="89" x2="186" y2="89" marker-end="url(#ah3)"/>
+              <rect class="d-box" x="190" y="54" width="130" height="70" rx="8"/>
+              <text class="d-t" x="255" y="95" text-anchor="middle">Gearbox</text>
+              <line class="d-line" x1="322" y1="89" x2="350" y2="89"/>
+              <polyline class="d-spring" points="350,89 362,69 380,109 398,69 416,109 434,69 452,109 470,69 482,89"/>
+              <line class="d-line" x1="482" y1="89" x2="540" y2="89" marker-end="url(#ah3)"/>
+              <rect class="d-box h" x="544" y="54" width="150" height="70" rx="8"/>
+              <text class="d-t" x="619" y="95" text-anchor="middle">Joint / leg</text>
+              <text class="d-mh" x="416" y="40" text-anchor="middle">measure stretch x</text>
+              <text class="d-mh" x="416" y="150" text-anchor="middle">force F = k &#183; x</text>
+              <text class="d-s" x="416" y="170" text-anchor="middle">the elastic part, in series</text>
+            </svg>
+          </div>
+          <figcaption>A series elastic actuator. The spring turns a hard problem (sensing force) into an easy one (measuring a stretch). The lecturer's master's thesis was on making these compact for bipedal robots.</figcaption>
+        </figure>
+        <ul class="links">
+          <li><a href="https://publications.ri.cmu.edu/a-compact-series-elastic-actuator-for-bipedal-robots-with-human-like-dynamic-performance" target="_blank" rel="noopener">A Compact Series Elastic Actuator for Bipedal Robots with Human Like Dynamic Performance</a><span class="muted">Mike's master's thesis, linked from the notes.</span></li>
+        </ul>
+      </section>
+
+      <section class="topic" id="r-limits">
+        <span class="topic-num">3 &middot; WHY THIS WAS HARD</span>
+        <h2>Limitations in robotics</h2>
+        <div class="prose">
+          <p>The notes list what held robots back in the past and what still holds them back now. Learn these as a list. They are easy exam questions.</p>
+        </div>
+        <ol class="timeline">
+          <li><span class="when">Until the late 2010s</span><div><h4>Computing and control algorithms</h4><p>Fast, reliable computing hardware and good control algorithms were missing. Dynamic motion (running, jumping, catching your balance) needs very fast, correct decisions, so it stayed limited.</p></div></li>
+          <li><span class="when">Until about 2020</span><div><h4>Battery and motor power density</h4><p><b>Power density</b> means how much power you get per kilogram. A humanoid robot has to carry its own batteries and motors, so weak power density was a barrier to practical, agile humanoids.</p></div></li>
+          <li><span class="when">Still true</span><div><h4>Human safety</h4><p>Dynamic robots often fail in unexpected ways. A common misconception: compliant (springy) joints do <b>not</b> necessarily make a collision with a person less dangerous.</p></div></li>
+          <li><span class="when">Today's barriers</span><div><h4>Perception, battery capacity, compact compute</h4><p>Reliably perceiving and interpreting the environment. Battery capacity for long runtimes. Compact computers powerful enough to run higher level planning with LLMs on the robot itself.</p></div></li>
+        </ol>
+        <div class="note">
+          <span class="eyebrow">Do not mix these up</span>
+          <p><b>Power density</b> (power per kilogram) was the older barrier for agile humanoids. <b>Battery capacity</b> (how long you can run) is listed as a modern barrier. Similar words, different points.</p>
+        </div>
+      </section>
+
+      <section class="topic" id="r-more">
+        <span class="topic-num">4 &middot; ALSO SHOWN IN LECTURE</span>
+        <h2>Other things discussed</h2>
+        <ul class="links">
+          <li><a href="https://www.youtube.com/watch?v=Bd5iEke6UlE" target="_blank" rel="noopener">Older dynamic robots (video)</a><span class="muted">What dynamic robots looked like before the modern era.</span></li>
+          <li><a href="https://www.youtube.com/watch?v=w5-6F8RknUM" target="_blank" rel="noopener">Robot fish at Olin (video)</a><span class="muted">A robot that swims instead of walks.</span></li>
+          <li><a href="https://www.instagram.com/p/Cvlxh4CMyXq/" target="_blank" rel="noopener">Mushie, a companion robot side project</a><span class="muted">A personal robot project shown in lecture.</span></li>
+          <li><a href="https://www.cs.cmu.edu/~113/" target="_blank" rel="noopener">15-113 and 15-114</a><span class="muted">Follow up courses for diving deeper into AI.</span></li>
+        </ul>
+      </section>
+
+      <div class="note exam">
+        <span class="eyebrow">Robotics in five lines</span>
+        <p>1. Sense, Think, Act is a loop: Sense &#8776; update the model, Think &#8776; controller, Act &#8776; view. 2. Position control is fast and repeatable in predictable places, and older walkers used it to keep the center of mass or ZMP over the support polygon (stable, but slow and stiff). 3. Force control lets robots react to touch and recover from collisions like humans. 4. Series elastic actuators and compliant joints beat traditional geared motors for precise force control, and modern robots often use high torque direct drive motors with less gearing. 5. Old barriers: power density (before 2020), compute and control algorithms (before the late 2010s). Ongoing: safety. Modern: perception, battery capacity, compact compute for on device LLM planning.</p>
+      </div>
+    </div>
+    <nav class="toc" aria-label="On this page">
+      <span class="eyebrow">On this page</span>
+      <button data-scroll="r-sta">Sense, Think, Act</button>
+      <button data-scroll="r-control">Position vs force control</button>
+      <button data-scroll="r-limits">Limitations</button>
+      <button data-scroll="r-more">Other things discussed</button>
+    </nav>
+  </div>
+</div>
+
+<!-- ======================================================= INTERPRETER -->
+<div class="view" id="view-interpreter" hidden>
+  <div class="page-head">
+    <span class="eyebrow">Topic 2 of 2</span>
+    <h1>Writing an interpreter for Lisp</h1>
+    <p class="lede">In lecture, a working Lisp interpreter was written in about an hour, in Python, using only things you already know: strings, lists, dictionaries and recursion. Here is every idea behind it.</p>
+  </div>
+  <div class="lesson">
+    <div class="lesson-body">
+
+      <section class="topic" id="i-lisp">
+        <span class="topic-num">1 &middot; THE LANGUAGE</span>
+        <h2>What is Lisp?</h2>
+        <div class="prose">
+          <p>Lisp is a real programming language, invented by <b>John McCarthy at MIT in 1958</b>. It is the <b>second oldest</b> programming language still in use today. Only <b>Fortran</b> is older.</p>
+          <p>Lecture built a small <b>subset</b> of Lisp and changed it a little. For example, it uses a command called <code>block</code> where real Lisp uses <code>progn</code>. Both mean "run these expressions in order and give back the last one."</p>
+          <p>One idea to hold onto for the whole topic: <b>code is just a multiline string of text</b>. Lisp code, Python code, all code. An interpreter is simply a program that reads that string and does what it says.</p>
+        </div>
+      </section>
+
+      <section class="topic" id="i-prefix">
+        <span class="topic-num">2 &middot; READING LISP</span>
+        <h2>Prefix notation</h2>
+        <div class="prose">
+          <p>Python puts operators between values: <code>1 + 2 + 3</code>. Lisp puts the command <b>first</b>, inside parentheses:</p>
+        </div>
+        <pre class="block">(command arg0 arg1 ... argN)
+
+(+ 1 2 3)        <span class="c">? adds 1, 2 and 3 to get 6</span></pre>
+        <div class="prose">
+          <p>Every expression has that shape. Because an argument can be another expression, expressions <b>nest</b>. Here is the example from the notes, solved from the inside out:</p>
+        </div>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead><tr><th>Step</th><th>Expression</th><th>What happened</th></tr></thead>
+            <tbody>
+              <tr><td>Start</td><td><code>(+ (+ 1 2) (* 3 4) (+ 5 (* 6 7)))</code></td><td>The outer <code>+</code> has three arguments, all expressions.</td></tr>
+              <tr><td>1</td><td><code>(+ 3 12 (+ 5 42))</code></td><td><code>(+ 1 2)</code> is 3, <code>(* 3 4)</code> is 12, <code>(* 6 7)</code> is 42.</td></tr>
+              <tr><td>2</td><td><code>(+ 3 12 47)</code></td><td><code>(+ 5 42)</code> is 47.</td></tr>
+              <tr><td>3</td><td><code>62</code></td><td>3 + 12 + 47.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <span class="eyebrow">A wording detail</span>
+          <p>The notes call this "prefix or RPN notation." Strictly speaking, Lisp uses <b>prefix</b> notation (also called Polish notation), where the command comes first. RPN stands for Reverse Polish Notation, where the operator comes <i>last</i> (<code>1 2 +</code>). For the exam, the key fact is that in Lisp the command comes first.</p>
+        </div>
+      </section>
+
+      <section class="topic" id="i-what">
+        <span class="topic-num">3 &middot; THE BIG PICTURE</span>
+        <h2>Interpreter versus compiler</h2>
+        <dl class="defs">
+          <div><dt>Interpreter</dt><dd>A program that takes code as input and <b>directly runs</b> it. This is what lecture wrote.</dd></div>
+          <div><dt>Compiler</dt><dd>A program that <b>translates</b> code into another language, such as assembly language, which then gets run later.</dd></div>
+        </dl>
+        <div class="prose">
+          <p>The lecture interpreter works in three steps, always in this order:</p>
+        </div>
+        <div class="pipeline" aria-label="Tokenize, then parse, then evaluate">
+          <div class="pipe-stage"><span class="eyebrow"><span>Input</span></span><p><b>Code</b>, a multiline string</p></div>
+          <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+          <div class="pipe-stage"><span class="eyebrow"><span>Step 1</span></span><p><b>Tokenize</b> into a flat 1D list of tokens</p></div>
+          <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+          <div class="pipe-stage"><span class="eyebrow"><span>Step 2</span></span><p><b>Parse</b> into a parse tree (nested lists)</p></div>
+          <div class="pipe-arrow" aria-hidden="true">&rarr;</div>
+          <div class="pipe-stage final"><span class="eyebrow"><span>Step 3</span></span><p><b>Evaluate</b> the tree to run it and get the output</p></div>
+        </div>
+      </section>
+
+      <section class="topic" id="i-tokenize">
+        <span class="topic-num">4 &middot; STEP 1</span>
+        <h2>Tokenize: string to list of tokens</h2>
+        <div class="prose">
+          <p>Tokenizing starts with the code (one big string) and returns a <b>1D list of tokens</b>. A token is the smallest meaningful piece of the language, like a word in a sentence. It can be:</p>
+          <ul>
+            <li>a <b>keyword</b>, like <code>while</code></li>
+            <li>a <b>variable</b>, like <code>x</code></li>
+            <li>an <b>integer</b>, like <code>123</code> (stored as a real Python int, not the string "123")</li>
+            <li><b>legal punctuation</b>, like a parenthesis</li>
+            <li>any other legal piece of syntax in the language</li>
+          </ul>
+          <p>Tokenizing is also where <b>whitespace and comments are removed</b>. After this step, the interpreter never sees a space or a comment again.</p>
+          <p>Lecture added a special <b>EOF</b> (End Of File) character to the end of the input to make tokenizing easier, so the loop always knows when to stop. It used <code>chr(0)</code>, because <code>chr(0)</code> can never appear in real code.</p>
+          <p>For the notes' example, the tokens are:</p>
+        </div>
+        <div class="tokens" id="notes-tokens"></div>
+        <div class="legend">
+          <span><span class="tok paren">(</span> parenthesis</span>
+          <span><span class="tok op">+</span> punctuation</span>
+          <span><span class="tok name">x</span> name</span>
+          <span><span class="tok num">12</span> integer</span>
+          <span><span class="tok eof">EOF</span> end marker, chr(0)</span>
+        </div>
+      </section>
+
+      <section class="topic" id="i-parse">
+        <span class="topic-num">5 &middot; STEP 2</span>
+        <h2>Parse: list of tokens to parse tree</h2>
+        <div class="prose">
+          <p>A flat list does not show which pieces are <i>inside</i> which. Parsing fixes that. It takes the 1D list of tokens and returns a <b>parse tree</b>: a hierarchical data structure that captures the structure of the program, so you can tell which parts are structurally within other parts.</p>
+          <p>To keep things simple and use only what 112 has covered, lecture represented the parse tree with <b>multidimensional lists</b>. Each expression becomes a list, and sub expressions become lists inside lists.</p>
+        </div>
+        <pre class="block">['+',
+    ['+', 1, 2],
+    ['*', 3, 4],
+    ['+', 5,
+          ['*', 6, 7]
+    ]
+]</pre>
+        <div class="prose">
+          <p>Parsing uses <b>recursion</b>, because expressions can be <b>arbitrarily nested</b>: an expression can contain an expression, which contains another, and so on. Each time the parser sees <code>(</code>, it calls itself to parse each argument, and each of those calls can do the same thing. A loop alone cannot easily handle unlimited depth. Recursion handles it naturally.</p>
+        </div>
+      </section>
+
+      <section class="topic" id="i-eval">
+        <span class="topic-num">6 &middot; STEP 3</span>
+        <h2>Evaluate: run the tree</h2>
+        <div class="prose">
+          <p>Evaluating is where the code finally runs. It takes the parse tree and performs the computations that produce the program's output.</p>
+          <p>It also uses <b>recursion</b>, for the same reason as parsing: expressions can be nested to any depth. To evaluate <code>['+', ['+', 1, 2], 4]</code>, the evaluator first evaluates each argument (calling itself on <code>['+', 1, 2]</code> to get 3), then adds the results.</p>
+          <h3>Where variables and functions live</h3>
+        </div>
+        <dl class="defs">
+          <div><dt>Variables: a dictionary</dt><dd>A dictionary maps variable names to their values. At the top level there is one dictionary for the <b>globals</b>.</dd></div>
+          <div><dt>Local variables: a new dictionary per call</dt><dd>Just <b>before calling a user defined function</b>, the interpreter creates a <b>brand new dictionary</b> to hold that function's local variables (starting with its parameters).</dd></div>
+          <div><dt>Functions: another dictionary</dt><dd>A second dictionary maps each <b>function name</b> to a <b>tuple</b> of its <b>parameter list</b> and its <b>body</b>. The parameter list is a list of names, like <code>['x', 'y']</code>. The body is a parse tree of the code to run when the function is called.</dd></div>
+        </dl>
+        <pre class="block"><span class="c"># after running (function f (x y) (+ x y))</span>
+functionsMap = { 'f': ( ['x', 'y'], ['+', 'x', 'y'] ) }
+<span class="c">#                      parameters    body (a parse tree)</span></pre>
+        <div class="prose">
+          <h3>Errors</h3>
+          <p>The interpreter <b>raised exceptions</b> when it detected common mistakes, such as <b>illegal tokens</b>, <b>undefined variables</b>, and <b>unknown commands</b>. The notes point out this was extremely helpful for debugging in real time while writing the interpreter.</p>
+        </div>
+      </section>
+
+      <section class="topic" id="i-shortcuts">
+        <span class="topic-num">7 &middot; HONEST TRADEOFFS</span>
+        <h2>Shortcuts lecture took</h2>
+        <div class="prose">
+          <p>To finish in just over an hour using mostly 112 material, lecture cut corners. The one the notes highlight: the tokenizer stored the code in a list and <b>popped off the front</b> with <code>pop(0)</code>. That is very inefficient and should not be done in practice.</p>
+          <p>Why: removing the first item of a Python list forces every other item to shift one spot left. For a list of length n, that is O(n) work, every single time. Do it for all n characters and the tokenizer becomes O(n&sup2;).</p>
+          <p>The notes list three better ways:</p>
+        </div>
+        <div class="table-wrap">
+          <table class="grid">
+            <thead><tr><th>Fix</th><th>How it works</th><th>Cost per step</th></tr></thead>
+            <tbody>
+              <tr><td>Reverse, then pop from the right</td><td>Reverse the list once, then use <code>pop()</code>, which removes the last item without shifting anything.</td><td>O(1)</td></tr>
+              <tr><td>Use a deque</td><td>A deque is like a list but is built to pop off the front efficiently, with <code>popleft()</code>.</td><td>O(1)</td></tr>
+              <tr><td>Use indexes</td><td>Never change the list. Keep an index <code>i</code> and move it forward.</td><td>O(1)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="prose"><p>The <a href="#code">annotated Python version</a> on this site uses the index approach.</p></div>
+      </section>
+
+      <section class="topic" id="i-fib">
+        <span class="topic-num">8 &middot; THE FINAL TEST</span>
+        <h2>Running recursive Fibonacci</h2>
+        <div class="prose">
+          <p>Lecture tested the finished interpreter by running a <b>recursive Fibonacci</b> function written in Lisp. It worked. Read it with the commands you now know:</p>
+        </div>
+        <pre class="block">(block
+    (function fib (n)            <span class="c">? define fib with one parameter, n</span>
+        (if (&lt; n 2)               <span class="c">? if n &lt; 2 ...</span>
+            1                    <span class="c">? ... then the answer is 1</span>
+            (+ (fib (- n 1))     <span class="c">? ... else fib(n-1) + fib(n-2)</span>
+               (fib (- n 2))
+            )
+        )
+    )
+    (set x 0)                    <span class="c">? x = 0</span>
+    (while (&lt; x 10)              <span class="c">? while x &lt; 10:</span>
+        (block
+            (output x (fib x))   <span class="c">?     print x and fib(x)</span>
+            (set  x (+ x 1))     <span class="c">?     x += 1</span>
+        )
+    )
+)</pre>
+        <div class="prose">
+          <p>It prints <code>[0, 1]</code>, <code>[1, 1]</code>, <code>[2, 2]</code>, <code>[3, 3]</code>, <code>[4, 5]</code>, and so on up to <code>[9, 55]</code>. Note that this version of fib starts 1, 1, 2, 3, 5, so <code>fib(0)</code> is 1.</p>
+          <p><a href="#playground">Open the Playground</a> and pick "Fibonacci" to watch every one of its steps.</p>
+        </div>
+      </section>
+
+      <div class="note exam">
+        <span class="eyebrow">Interpreter in five lines</span>
+        <p>1. Lisp: John McCarthy, MIT, 1958, second oldest language still used (after Fortran). Prefix notation: <code>(command arg0 ... argN)</code>, expressions nest. 2. An interpreter runs code directly. A compiler translates it to another language. 3. Tokenize (string to 1D token list, removes whitespace and comments, adds EOF = chr(0)), then Parse (tokens to a parse tree of nested lists, recursive), then Evaluate (runs the tree, recursive). 4. Globals live in a dictionary, each user defined function call gets a new local dictionary, and functions map name to (parameter list, body). Exceptions catch illegal tokens, undefined variables and unknown commands. 5. <code>pop(0)</code> is slow (O(n)). Fix with reverse plus <code>pop()</code>, a deque, or indexes.</p>
+      </div>
+    </div>
+    <nav class="toc" aria-label="On this page">
+      <span class="eyebrow">On this page</span>
+      <button data-scroll="i-lisp">What is Lisp?</button>
+      <button data-scroll="i-prefix">Prefix notation</button>
+      <button data-scroll="i-what">Interpreter vs compiler</button>
+      <button data-scroll="i-tokenize">Step 1: Tokenize</button>
+      <button data-scroll="i-parse">Step 2: Parse</button>
+      <button data-scroll="i-eval">Step 3: Evaluate</button>
+      <button data-scroll="i-shortcuts">Shortcuts</button>
+      <button data-scroll="i-fib">Fibonacci test</button>
+    </nav>
+  </div>
+</div>
+
+<!-- ======================================================= PLAYGROUND -->
+<div class="view" id="view-playground" hidden>
+  <div class="page-head">
+    <span class="eyebrow">Hands on</span>
+    <h1>Interpreter playground</h1>
+    <p class="lede">Write Lisp, press Run, and see all three steps: the tokens, the parse tree, and every single evaluation step. It behaves exactly like the lecture's <code>lisp2.py</code> (tested on 64 programs).</p>
+  </div>
+
+  <div class="pg">
+    <div class="pg-top">
+      <div class="panel">
+        <div class="panel-h">
+          <h3>Your Lisp code</h3>
+          <div class="ex-row">
+            <label for="example" class="hint">Example</label>
+            <select id="example"></select>
+          </div>
+        </div>
+        <div class="panel-b">
+          <p class="ex-desc" id="ex-desc"></p>
+          <textarea id="code" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Lisp code"></textarea>
+          <div class="ex-row">
+            <button class="btn primary" id="run" type="button">Run &#9654;</button>
+            <span class="hint">Shortcut: Ctrl + Enter (Cmd + Enter on Mac). Comments start with <code>?</code></span>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>Output and result</h3></div>
+        <div class="panel-b" id="results"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-h">
+        <h3><span class="step-n">STEP 1</span>Tokens</h3>
+        <div class="ex-row">
+          <span class="hint" id="tok-count"></span>
+          <div class="seg" role="group" aria-label="Token view">
+            <button type="button" id="tok-chips" aria-pressed="true">Chips</button>
+            <button type="button" id="tok-py" aria-pressed="false">Python list</button>
+          </div>
+        </div>
+      </div>
+      <div class="panel-b"><div id="tokens"></div></div>
+    </div>
+
+    <div class="pg-eval">
+      <div class="panel">
+        <div class="panel-h">
+          <h3><span class="step-n">STEP 2</span>Parse tree</h3>
+          <div class="seg" role="group" aria-label="Tree view">
+            <button type="button" id="tree-vis" aria-pressed="true">Tree</button>
+            <button type="button" id="tree-py" aria-pressed="false">Python list</button>
+          </div>
+        </div>
+        <div class="panel-b tree-box" id="tree-box"></div>
+      </div>
+      <div class="panel" id="stepper-panel">
+        <div class="panel-h">
+          <h3><span class="step-n">STEP 3</span>Evaluate, one step at a time</h3>
+        </div>
+        <div class="panel-b" id="stepper"></div>
+      </div>
+    </div>
+
+    <div class="prose">
+      <h2>Quirks of this tiny Lisp</h2>
+      <p class="muted">These come from how lecture's code works, not from the notes, so they are not exam material. They are great for testing whether you really understand the evaluator. Click one to load it.</p>
+    </div>
+    <div class="quirks" id="quirks"></div>
+  </div>
+</div>
+
+<!-- ======================================================= CODE -->
+<div class="view" id="view-code" hidden>
+  <div class="page-head">
+    <span class="eyebrow">Optional deep dive</span>
+    <h1>The interpreter, line by line</h1>
+    <p class="lede">This is a complete working Lisp interpreter in Python, under 250 lines including all the comments. It follows the same design as the lecture's <code>lisp2.py</code> and gives identical results, with one improvement the notes recommend: it walks through the input with an index instead of <code>pop(0)</code>.</p>
+  </div>
+  <div class="note exam">
+    <span class="eyebrow">Not on the exam</span>
+    <p>The notes say you are not responsible for the actual interpreter code. Read this to make the ideas concrete, not to memorize it. The lecture's own files are <a href="https://www.cs.cmu.edu/~112/notes/lisp1.py" target="_blank" rel="noopener">lisp1.py</a> and <a href="https://www.cs.cmu.edu/~112/notes/lisp2.py" target="_blank" rel="noopener">lisp2.py</a>.</p>
+  </div>
+  <div class="walk" id="walk"></div>
+  <div class="prose">
+    <h2>How this differs from lecture's lisp2.py</h2>
+  </div>
+  <div class="table-wrap">
+    <table class="grid">
+      <thead><tr><th>Part</th><th>lisp2.py (lecture)</th><th>minilisp.py (this site)</th></tr></thead>
+      <tbody>
+        <tr><td>Moving through input</td><td><code>code.pop(0)</code> and <code>tokens.pop(0)</code>, O(n) each time</td><td>An index <code>i</code> that moves forward, O(1) each time</td></tr>
+        <tr><td>Parser return value</td><td>Just the tree (the token list shrinks as it goes)</td><td>The tree plus the next index, as a tuple</td></tr>
+        <tr><td>Undefined variable</td><td>Python's own KeyError</td><td>A clear <code>Undefined variable</code> message (lisp1.py had this check too)</td></tr>
+        <tr><td>Error type</td><td>Plain <code>Exception</code></td><td>A custom <code>LispError</code> class</td></tr>
+        <tr><td>Results</td><td colspan="2">Identical tokens, parse trees, printed output and results on all 64 test programs, including every lecture example.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ======================================================= QUIZ -->
+<div class="view" id="view-quiz" hidden>
+  <div class="page-head">
+    <span class="eyebrow">Check yourself</span>
+    <h1>Practice quizzes</h1>
+    <p class="lede">Every question comes straight from what the notes say could be tested. Pick an answer to see whether it is right and why.</p>
+  </div>
+  <div class="quiz-head">
+    <div class="seg" role="group" aria-label="Choose quiz">
+      <button type="button" data-quiz="robotics" aria-pressed="true">Robotics</button>
+      <button type="button" data-quiz="interp" aria-pressed="false">Interpreter</button>
+    </div>
+    <div class="ex-row">
+      <span class="score" id="score"></span>
+      <button class="btn" type="button" id="quiz-reset">Start over</button>
+    </div>
+  </div>
+  <ol class="qlist" id="qlist"></ol>
+</div>
+
+<!-- ======================================================= CHEAT SHEET -->
+<div class="view" id="view-cheatsheet" hidden>
+  <div class="page-head">
+    <span class="eyebrow">Night before review</span>
+    <h1>Cheat sheet</h1>
+    <p class="lede">Everything from both sets of notes on one page.</p>
+  </div>
+  <div class="cheat">
+    <div class="cheat-card">
+      <h3>Sense, Think, Act <span class="eyebrow">Robotics</span></h3>
+      <ul>
+        <li><b>Sense:</b> new info from sensors (environment, robot state, external commands). &#8776; updating the model.</li>
+        <li><b>Think:</b> draw conclusions, estimate, plan an action. &#8776; the controller.</li>
+        <li><b>Act:</b> move motors, send messages, other outputs. &#8776; the view.</li>
+        <li>The MVC analogy is <i>loose</i>. The loop repeats forever.</li>
+      </ul>
+    </div>
+    <div class="cheat-card">
+      <h3>Position vs force control <span class="eyebrow">Robotics</span></h3>
+      <ul>
+        <li><b>Position control:</b> command exact positions. Industrial robots, very fast repetitive motion, predictable environments.</li>
+        <li>Older walkers kept the <b>center of mass or ZMP above the support polygon</b> at all times. Stable but slow, stiff, toy like.</li>
+        <li><b>Force control:</b> robots act more like humans, react to touch, recover from unexpected collisions.</li>
+        <li><b>Series elastic actuators</b> and <b>compliant joints</b> beat traditional geared motors for precise force control.</li>
+        <li>Modern robots: <b>very high torque direct drive motors</b>, less gearing.</li>
+      </ul>
+    </div>
+    <div class="cheat-card">
+      <h3>Limitations <span class="eyebrow">Robotics</span></h3>
+      <ul>
+        <li>Before 2020: <b>battery and motor power density</b> blocked practical, agile humanoids.</li>
+        <li>Before the late 2010s: <b>fast, reliable compute and control algorithms</b> limited dynamic motion.</li>
+        <li>Ongoing: <b>human safety</b>. Dynamic robots fail unexpectedly. Compliant joints do <i>not</i> necessarily reduce collision danger.</li>
+        <li>Modern: <b>perception and interpretation</b>, <b>battery capacity</b> for long runtimes, <b>compact compute</b> for on device LLM planning.</li>
+      </ul>
+    </div>
+    <div class="cheat-card">
+      <h3>Lisp basics <span class="eyebrow">Interpreter</span></h3>
+      <ul>
+        <li>John McCarthy, MIT, 1958. Second oldest language still in use. Fortran is older.</li>
+        <li>Lecture: small subset, <code>block</code> instead of <code>progn</code>.</li>
+        <li>Code is just a multiline string.</li>
+        <li>Prefix: <code>(command arg0 ... argN)</code>. <code>(+ 1 2 3)</code> is 6. Expressions nest.</li>
+        <li>Interpreter runs code directly. Compiler translates to another language (like assembly).</li>
+      </ul>
+    </div>
+    <div class="cheat-card">
+      <h3>The three steps <span class="eyebrow">Interpreter</span></h3>
+      <ul>
+        <li><b>Tokenize:</b> string &rarr; 1D list of tokens (keywords, variables, ints, punctuation). Removes whitespace and comments. Adds EOF = <code>chr(0)</code> at the end.</li>
+        <li><b>Parse:</b> tokens &rarr; parse tree. Nested lists. Recursive, because nesting is arbitrary.</li>
+        <li><b>Evaluate:</b> tree &rarr; output. Recursive, same reason.</li>
+      </ul>
+      <pre>(+ 1 (* 2 3))
+['(', '+', 1, '(', '*', 2, 3, ')', ')', EOF]
+['+', 1, ['*', 2, 3]]
+7</pre>
+    </div>
+    <div class="cheat-card">
+      <h3>Inside evaluate <span class="eyebrow">Interpreter</span></h3>
+      <ul>
+        <li>Globals: one dictionary, name &rarr; value.</li>
+        <li>Each user defined function call: a <b>new</b> dictionary for its locals, created just before the call.</li>
+        <li>Functions: name &rarr; <b>(parameter list, body parse tree)</b>, e.g. <code>{'f': (['x','y'], ['+','x','y'])}</code>.</li>
+        <li>Exceptions for illegal tokens, undefined variables, unknown commands.</li>
+        <li><code>pop(0)</code> is O(n). Fixes: reverse then <code>pop()</code>, a deque, or indexes.</li>
+        <li>Final test: recursive fib in Lisp. It worked.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</main>
+<footer>
+  Built from the CMU 15-112 Fall 2026 notes: <a href="https://www.cs.cmu.edu/~112/notes/advanced-topic-robotics.html" target="_blank" rel="noopener">Advanced Topic: Robotics</a> and <a href="https://www.cs.cmu.edu/~112/notes/advanced-topic-lisp.html" target="_blank" rel="noopener">Advanced Topic: Writing an Interpreter (for Lisp)</a>. An unofficial study guide.
+</footer>
+
+<script>
+/* MiniLisp engine: a JavaScript mirror of minilisp.py (and lecture's lisp2.py).
+   Numbers are BigInt so arithmetic matches Python exactly.
+   evaluate() records a trace of events so the page can step through it. */
+const MiniLisp = (() => {
+  'use strict';
+  const EOF = '\u0000';
+  const COMMENT_CHAR = '?';
+  const PUNCT = new Set('!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'); // Python string.punctuation
+
+  class LispError extends Error {
+    constructor(message, stage) { super(message); this.stage = stage || 'evaluate'; }
+  }
+
+  const isSpace = c => /\s/u.test(c);
+  const isDigit = c => c >= '0' && c <= '9';
+  const isAlpha = c => /\p{L}/u.test(c);
+  const isInt = x => typeof x === 'bigint';
+
+  /* ===== STEP 1: TOKENIZE ===== */
+  function tokenize(code) {
+    code += EOF;
+    const tokens = [];
+    let i = 0;
+    while (code[i] !== EOF) {
+      const c = code[i];
+      if (isSpace(c)) {
+        i += 1;
+      } else if (c === COMMENT_CHAR) {
+        while (code[i] !== '\n' && code[i] !== EOF) i += 1;
+      } else if (isDigit(c)) {
+        const start = i;
+        while (isDigit(code[i])) i += 1;
+        tokens.push(BigInt(code.slice(start, i)));
+      } else if (isAlpha(c)) {
+        const start = i;
+        while (isAlpha(code[i])) i += 1;
+        tokens.push(code.slice(start, i));
+      } else if (PUNCT.has(c)) {
+        tokens.push(c);
+        i += 1;
+      } else {
+        throw new LispError(`Illegal character: ${pyRepr(c)}. Only letters, digits, spaces and punctuation are allowed.`, 'tokenize');
+      }
+    }
+    tokens.push(EOF);
+    return tokens;
+  }
+
+  /* ===== STEP 2: PARSE ===== */
+  function parse(tokens) {
+    return parseExpression(tokens, 0)[0];
+  }
+  function parseExpression(tokens, i) {
+    const token = tokens[i];
+    if (token === EOF || token === undefined) {
+      throw new LispError("The code ended too early. Is a ')' missing?", 'parse');
+    } else if (token === '(') {
+      const cmd = tokens[i + 1];
+      if (cmd === EOF || cmd === undefined) {
+        throw new LispError("The code ended too early. Is a ')' missing?", 'parse');
+      }
+      const tree = [cmd];
+      i += 2;
+      while (tokens[i] !== ')') {
+        if (tokens[i] === EOF || tokens[i] === undefined) {
+          throw new LispError("The code ended too early. Is a ')' missing?", 'parse');
+        }
+        const [child, next] = parseExpression(tokens, i);
+        tree.push(child);
+        i = next;
+      }
+      return [tree, i + 1];
+    }
+    return [token, i + 1];
+  }
+
+  /* ===== Python style repr, so output matches what Python prints ===== */
+  function pyRepr(x) {
+    if (isInt(x)) return x.toString();
+    if (Array.isArray(x)) return '[' + x.map(pyRepr).join(', ') + ']';
+    if (typeof x === 'string') {
+      if (x === EOF) return "'\\x00'";
+      if (x.includes("'") && !x.includes('"')) return '"' + x.replace(/\\/g, '\\\\') + '"';
+      return "'" + x.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+    }
+    return String(x);
+  }
+  // Lisp style source text for a parse tree node, e.g. (+ 1 (* 2 3))
+  function toLisp(x) {
+    if (Array.isArray(x)) return '(' + x.map(toLisp).join(' ') + ')';
+    if (isInt(x)) return x.toString();
+    return x === EOF ? 'EOF' : String(x);
+  }
+
+  /* ===== math helpers (same behavior as Python, including errors) ===== */
+  function needOne(L, cmd) {
+    if (L.length === 0) throw new LispError(`(${cmd}) needs at least one argument. Python would raise IndexError here.`);
+  }
+  function floorDiv(a, b) {
+    if (b === 0n) throw new LispError('Division by zero. Python would raise ZeroDivisionError here.');
+    let q = a / b;
+    if (a % b !== 0n && ((a < 0n) !== (b < 0n))) q -= 1n;
+    return q;
+  }
+  const helpers = {
+    '+': L => L.reduce((s, v) => s + v, 0n),
+    '*': L => { needOne(L, '*'); return L.slice(1).reduce((r, v) => r * v, L[0]); },
+    '/': L => { needOne(L, '/'); return L.slice(1).reduce((r, v) => floorDiv(r, v), L[0]); },
+    '-': L => { needOne(L, '-'); return L.slice(1).reduce((r, v) => r - v, L[0]); },
+    '<': L => { for (let i = 1; i < L.length; i++) if (L[i - 1] >= L[i]) return 0n; return 1n; },
+  };
+
+  // Variables live in a Map. Python dict keys here are names (str) or, in
+  // odd programs like (set 5 3), ints. Keep those from colliding.
+  const keyOf = k => {
+    if (isInt(k)) return 'int:' + k.toString();
+    if (typeof k === 'string') return k;
+    throw new LispError(`${toLisp(k)} cannot be used as a variable name. Python would raise TypeError (unhashable list).`);
+  };
+  const nameOf = key => key.startsWith('int:') ? key.slice(4) : key;
+
+  /* ===== STEP 3: EVALUATE (with a recorded trace) ===== */
+  function run(code, opts = {}) {
+    const maxSteps = opts.maxSteps ?? 300000;
+    const maxDepth = opts.maxDepth ?? 2500;
+    const maxEvents = opts.maxEvents ?? 30000;
+    const result = { tokens: null, tree: null, outputs: [], value: null, error: null,
+                     events: [], truncated: false, steps: 0, globals: [], functions: [] };
+    try { result.tokens = tokenize(code); }
+    catch (e) { result.error = asError(e, 'tokenize'); return result; }
+    try { result.tree = parse(result.tokens.slice()); }
+    catch (e) { result.error = asError(e, 'parse'); return result; }
+
+    const functionsMap = new Map();
+    const globalFrame = { label: 'global', vars: new Map() };
+    const frames = [globalFrame];
+    let scopeSnap = snapshot(globalFrame);
+    let stackSnap = ['global'];
+    let steps = 0;
+
+    function snapshot(frame) {
+      return { label: frame.label, vars: [...frame.vars].map(([k, v]) => [nameOf(k), v.toString()]) };
+    }
+    function record(ev) {
+      if (result.events.length >= maxEvents) { result.truncated = true; return; }
+      ev.s = scopeSnap; ev.k = stackSnap;
+      result.events.push(ev);
+    }
+
+    function evaluate(node, frame, path, depth) {
+      steps += 1;
+      if (steps > maxSteps) {
+        throw new LispError(`Stopped after ${maxSteps.toLocaleString()} steps. This is probably an infinite loop: a while only stops when its test becomes exactly 0.`);
+      }
+      if (depth > maxDepth) {
+        throw new LispError('Too much recursion (is a function calling itself forever?). Python would raise RecursionError here.');
+      }
+      record({ t: 'in', p: path, d: depth });
+      const value = evaluateInner(node, frame, path, depth);
+      record({ t: 'out', p: path, d: depth, v: value.toString() });
+      return value;
+    }
+
+    function arg(args, i, cmd) {
+      if (i >= args.length) {
+        throw new LispError(`(${cmd} ...) is missing an argument. Python would raise IndexError here.`);
+      }
+      return args[i];
+    }
+
+    function evaluateInner(node, frame, path, depth) {
+      if (isInt(node)) return node;
+      if (typeof node === 'string') {
+        const key = keyOf(node);
+        if (!frame.vars.has(key)) {
+          const hint = frame === globalFrame ? '' :
+            ` Inside a function you can only see that function's parameters and the variables it sets, never globals.`;
+          throw new LispError(`Undefined variable: ${node === EOF ? 'EOF' : node}.${hint}`);
+        }
+        return frame.vars.get(key);
+      }
+      if (!Array.isArray(node)) throw new LispError(`Illegal parse tree: ${pyRepr(node)}`);
+      const cmd = node[0];
+      const args = node.slice(1);
+      const kid = i => path + '.' + (i + 1); // path of args[i]
+
+      if (cmd === 'set') {
+        const name = arg(args, 0, cmd);
+        const key = keyOf(name);
+        const value = evaluate(arg(args, 1, cmd), frame, kid(1), depth + 1);
+        frame.vars.set(key, value);
+        scopeSnap = snapshot(frame);
+        record({ t: 'msg', p: path, d: depth, text: `${toLisp(name)} is now ${value} (in the ${frame.label === 'global' ? 'global' : frame.label} scope)` });
+        return value;
+      }
+      if (cmd === 'if') {
+        const cond = evaluate(arg(args, 0, cmd), frame, kid(0), depth + 1);
+        if (cond === 1n) {
+          record({ t: 'msg', p: path, d: depth, text: `Test gave 1, so only the THEN branch runs.` });
+          return evaluate(arg(args, 1, cmd), frame, kid(1), depth + 1);
+        }
+        record({ t: 'msg', p: path, d: depth, text: `Test gave ${cond}, which is not 1, so only the ELSE branch runs.` });
+        return evaluate(arg(args, 2, cmd), frame, kid(2), depth + 1);
+      }
+      if (cmd === 'while') {
+        let res = 0n;
+        while (true) {
+          const cond = evaluate(arg(args, 0, cmd), frame, kid(0), depth + 1);
+          if (cond === 0n) {
+            record({ t: 'msg', p: path, d: depth, text: `Test gave 0, so the loop ends and returns ${res}.` });
+            return res;
+          }
+          record({ t: 'msg', p: path, d: depth, text: `Test gave ${cond} (not 0), so the body runs again.` });
+          res = evaluate(arg(args, 1, cmd), frame, kid(1), depth + 1);
+        }
+      }
+      if (cmd === 'function') {
+        const name = arg(args, 0, cmd), parms = arg(args, 1, cmd), body = arg(args, 2, cmd);
+        functionsMap.set(name, { parms, body, bodyPath: kid(2) });
+        record({ t: 'msg', p: path, d: depth, text: `Stored function ${toLisp(name)} with parameters ${toLisp(parms)}. Its body does not run yet.` });
+        return 0n;
+      }
+
+      const ev = args.map((a, i) => evaluate(a, frame, kid(i), depth + 1));
+      if (Object.prototype.hasOwnProperty.call(helpers, cmd)) return helpers[cmd](ev);
+      if (cmd === 'block') {
+        if (ev.length === 0) throw new LispError('(block) needs at least one expression. Python would raise IndexError here.');
+        return ev[ev.length - 1];
+      }
+      if (cmd === 'output') {
+        const line = pyRepr(ev);
+        result.outputs.push(line);
+        record({ t: 'msg', p: path, d: depth, text: `Printed ${line}`, out: true });
+        return 0n;
+      }
+      if (functionsMap.has(cmd)) {
+        const fn = functionsMap.get(cmd);
+        let parms = fn.parms;
+        if (typeof parms === 'string') parms = [...parms];   // Python len()/zip() on a str works char by char
+        if (!Array.isArray(parms)) throw new LispError(`The parameter list of ${toLisp(cmd)} is not a list. Python would raise TypeError here.`);
+        if (ev.length !== parms.length) {
+          throw new LispError(`Wrong number of arguments to ${toLisp(cmd)}: it takes ${parms.length} but got ${ev.length}.`);
+        }
+        const local = { label: '', vars: new Map() };
+        parms.forEach((p, i) => local.vars.set(keyOf(p), ev[i]));
+        local.label = `${toLisp(cmd)}(${parms.map((p, i) => `${toLisp(p)}=${ev[i]}`).join(', ')})`;
+        frames.push(local);
+        const savedScope = scopeSnap, savedStack = stackSnap;
+        scopeSnap = snapshot(local);
+        stackSnap = stackSnap.concat(local.label);
+        record({ t: 'msg', p: path, d: depth, text: `Calling ${local.label}: a brand new local dictionary is created for it.`, call: fn.bodyPath });
+        let value;
+        try {
+          value = evaluate(fn.body, local, fn.bodyPath, depth + 1);
+        } finally {
+          frames.pop();
+          scopeSnap = savedScope; stackSnap = savedStack;
+        }
+        record({ t: 'msg', p: path, d: depth, text: `${local.label} returned ${value}. Its local dictionary is thrown away.` });
+        return value;
+      }
+      throw new LispError(`Unknown command: ${toLisp(cmd)}`);
+    }
+
+    try {
+      result.value = evaluate(result.tree, globalFrame, 'r', 0);
+    } catch (e) {
+      result.error = asError(e, 'evaluate');
+    }
+    result.steps = steps;
+    result.globals = snapshot(globalFrame).vars;
+    result.functions = [...functionsMap].map(([n, f]) => [toLisp(n), toLisp(f.parms)]);
+    return result;
+  }
+
+  function asError(e, stage) {
+    if (e instanceof LispError) return { message: e.message, stage: e.stage === 'evaluate' ? stage : e.stage };
+    if (e instanceof RangeError) {
+      return { message: 'Too much recursion for the browser to handle. Python would raise RecursionError here.', stage };
+    }
+    return { message: String(e && e.message || e), stage };
+  }
+
+  return { EOF, tokenize, parse, run, pyRepr, toLisp, LispError, isInt };
+})();
+if (typeof module !== 'undefined') module.exports = MiniLisp;
+
+</script>
+<script id="py-source" type="application/json">"'''\nminilisp.py\n\nA tiny Lisp interpreter built the same way as the one written live in\nCMU 15-112 lecture: Tokenize, then Parse, then Evaluate.\n\nIt understands the same small language as the lecture's lisp2.py:\n    numbers:     0, 7, 123            (whole numbers only, no negatives)\n    variables:   x, total, fib        (letters only)\n    comments:    ? anything after a question mark, to the end of the line\n    commands:    (+ a b ...)  (- a b ...)  (* a b ...)  (/ a b ...)\n                 (< a b ...)            -> 1 if strictly increasing, else 0\n                 (set NAME VALUE)       -> store a variable\n                 (if TEST THEN ELSE)    -> THEN runs only when TEST is exactly 1\n                 (while TEST BODY)      -> repeats until TEST is 0\n                 (block E1 E2 ... En)   -> runs each, returns the last\n                 (output E1 ... En)     -> prints the values as a list\n                 (function NAME (P1 ... Pk) BODY)\n\nOne deliberate difference from lecture: the tokenizer and parser walk\nthrough their input with an index i instead of calling list.pop(0).\npop(0) has to shift every remaining item left, so it costs O(n) each\ntime, which makes the whole tokenizer O(n**2). Moving an index costs\nO(1), so tokenizing and parsing are both O(n). The lecture notes list\nthis exact fix (along with reversing the list or using a deque).\n\nRun this file to see the lecture's fib example, or run the tests in\ntests/test_minilisp.py.\n'''\n\nimport string\n\nEOF = chr(0)          # special end of file marker; chr(0) never appears in real code\nCOMMENT_CHAR = '?'    # same comment character as lecture's lisp2.py\n\nclass LispError(Exception):\n    '''Raised for any mistake in the Lisp program we are running.'''\n\n# =====================================================================\n# STEP 1: TOKENIZE\n# Input:  the code, one big multiline string\n# Output: a flat 1D list of tokens, ending with EOF\n# =====================================================================\n\ndef tokenize(code):\n    code += EOF\n    tokens = [ ]\n    i = 0\n    while code[i] != EOF:\n        c = code[i]\n        if c.isspace():\n            # whitespace only separates tokens, so we skip it\n            i += 1\n        elif c == COMMENT_CHAR:\n            # skip everything up to (not including) the end of the line\n            while code[i] not in ['\\n', EOF]:\n                i += 1\n        elif c.isdigit():\n            # a number: keep reading digits, then convert to an int\n            start = i\n            while code[i].isdigit():\n                i += 1\n            tokens.append(int(code[start:i]))\n        elif c.isalpha():\n            # a name: keep reading letters\n            start = i\n            while code[i].isalpha():\n                i += 1\n            tokens.append(code[start:i])\n        elif c in string.punctuation:\n            # punctuation like ( ) + * < is always a 1 character token\n            tokens.append(c)\n            i += 1\n        else:\n            raise LispError(f'Illegal character: {c!r}')\n    tokens.append(EOF)\n    return tokens\n\n# =====================================================================\n# STEP 2: PARSE\n# Input:  the 1D list of tokens\n# Output: a parse tree, built from nested lists\n#         (+ 1 (* 2 3))  becomes  ['+', 1, ['*', 2, 3]]\n# =====================================================================\n\ndef parse(tokens):\n    parseTree, nextIndex = parseExpression(tokens, 0)\n    return parseTree\n\ndef parseExpression(tokens, i):\n    # Parses ONE expression that starts at tokens[i].\n    # Returns (the parse tree for it, the index just past it).\n    token = tokens[i]\n    if token == EOF:\n        raise LispError(\"The code ended too early. Is a ')' missing?\")\n    elif token == '(':\n        # ( CMD ARG ARG ... ARG )\n        cmd = tokens[i + 1]\n        if cmd == EOF:\n            raise LispError(\"The code ended too early. Is a ')' missing?\")\n        parseTree = [ cmd ]\n        i += 2\n        while tokens[i] != ')':\n            # each argument can itself be a whole expression, so we\n            # recurse: this is why parsing handles any depth of nesting\n            child, i = parseExpression(tokens, i)\n            parseTree.append(child)\n        return parseTree, i + 1   # i + 1 skips over the ')'\n    else:\n        # an int or a name stands for itself\n        return token, i + 1\n\n# =====================================================================\n# STEP 3: EVALUATE\n# Input:  a parse tree\n# Output: the value it computes (and any printing it does along the way)\n# =====================================================================\n\nglobalVars = dict()     # variable name -> value, for the top level\nfunctionsMap = dict()   # function name -> (parameter list, body parse tree)\n\ndef evaluate(parseTree, localVars=None):\n    if localVars == None:\n        localVars = globalVars\n    if isinstance(parseTree, int):\n        # a number evaluates to itself\n        return parseTree\n    elif isinstance(parseTree, str):\n        # a name evaluates to that variable's current value\n        varName = parseTree\n        if varName not in localVars:\n            raise LispError(f'Undefined variable: {varName}')\n        return localVars[varName]\n    elif isinstance(parseTree, list):\n        cmd = parseTree[0]\n        args = parseTree[1:]\n\n        # Special forms: these decide for themselves which arguments\n        # to evaluate, so we must handle them BEFORE evaluating args.\n        if cmd == 'set':\n            # (set NAME VALUE): NAME is not evaluated, VALUE is\n            varName = args[0]\n            varValue = evaluate(args[1], localVars)\n            localVars[varName] = varValue\n            return varValue\n        elif cmd == 'if':\n            # (if TEST THEN ELSE): only one branch ever runs\n            condition = evaluate(args[0], localVars)\n            if condition == 1:\n                return evaluate(args[1], localVars)\n            else:\n                return evaluate(args[2], localVars)\n        elif cmd == 'while':\n            # (while TEST BODY): returns the body's last value, or 0\n            result = 0\n            while True:\n                condition = evaluate(args[0], localVars)\n                if condition == 0:\n                    return result\n                result = evaluate(args[1], localVars)\n        elif cmd == 'function':\n            # (function NAME PARMS BODY): store it, do not run it yet\n            fnName = args[0]\n            parms = args[1]\n            body = args[2]\n            functionsMap[fnName] = (parms, body)\n            return 0\n\n        # Everything else is a normal call: evaluate every argument first\n        evaluatedArgs = [evaluate(arg, localVars) for arg in args]\n        if cmd == '+': return sum(evaluatedArgs)\n        elif cmd == '*': return multiply(evaluatedArgs)\n        elif cmd == '/': return divide(evaluatedArgs)\n        elif cmd == '-': return subtract(evaluatedArgs)\n        elif cmd == '<': return lessThan(evaluatedArgs)\n        elif cmd == 'block': return evaluatedArgs[-1]\n        elif cmd == 'output': print(evaluatedArgs); return 0\n        elif cmd in functionsMap:\n            # a user defined function call\n            parms, body = functionsMap[cmd]\n            if len(evaluatedArgs) != len(parms):\n                raise LispError(f'Wrong number of arguments to {cmd}')\n            # brand new dictionary = brand new local scope\n            localVars = dict()\n            for parm, arg in zip(parms, evaluatedArgs):\n                localVars[parm] = arg\n            return evaluate(body, localVars)\n        else:\n            raise LispError(f'Unknown command: {cmd}')\n    else:\n        raise LispError(f'Illegal parse tree: {parseTree}')\n\n# Helpers for the math commands. Each takes the list of evaluated args.\n\ndef multiply(L):\n    result = L[0]\n    for v in L[1:]: result *= v\n    return result\n\ndef divide(L):\n    result = L[0]\n    for v in L[1:]: result //= v    # integer (floor) division\n    return result\n\ndef subtract(L):\n    result = L[0]\n    for v in L[1:]: result -= v\n    return result\n\ndef lessThan(L):\n    # (< a b c) is 1 only if a < b < c\n    for i in range(1, len(L)):\n        if L[i-1] >= L[i]:\n            return 0\n    return 1\n\n# =====================================================================\n# PUTTING IT TOGETHER\n# =====================================================================\n\ndef run(code):\n    '''Tokenize, parse, and evaluate code with fresh globals.'''\n    globalVars.clear()\n    functionsMap.clear()\n    return evaluate(parse(tokenize(code)))\n\nif __name__ == '__main__':\n    code = '''\n        (block\n            (function fib (n)\n                (if (< n 2)\n                    1\n                    (+ (fib (- n 1))\n                       (fib (- n 2))\n                    )\n                )\n            )\n            (set x 0)\n            (while (< x 10)\n                (block\n                    (output x (fib x))\n                    (set x (+ x 1))\n                )\n            )\n        )\n    '''\n    print('tokens:   ', tokenize(code))\n    print('parseTree:', parse(tokenize(code)))\n    print('-----')\n    print('result:   ', run(code))\n"</script>
+<script>
+(() => {
+'use strict';
+const L = MiniLisp;
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('ri:' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('ri:' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+};
+
+/* ================= token chips (shared) ================= */
+function tokenChip(t) {
+  if (L.isInt(t)) return `<span class="tok num">${t}</span>`;
+  if (t === L.EOF) return `<span class="tok eof" title="chr(0)">EOF</span>`;
+  if (t === '(' || t === ')') return `<span class="tok paren">${t}</span>`;
+  if (/^\p{L}+$/u.test(t)) return `<span class="tok name">${esc(t)}</span>`;
+  return `<span class="tok op">${esc(t)}</span>`;
+}
+const chips = tokens => tokens.map(tokenChip).join('');
+$('#hero-tokens').innerHTML = chips(L.tokenize('(+ 1 (* 2 3))'));
+$('#notes-tokens').innerHTML = chips(L.tokenize('(+ (+ 1 2) (* 3 4) (+ 5 (* 6 7)))'));
+
+/* ================= routing ================= */
+const VIEWS = ['start', 'robotics', 'interpreter', 'playground', 'code', 'quiz', 'cheatsheet'];
+let currentView = null;
+function route() {
+  const h = location.hash.slice(1);
+  const v = VIEWS.includes(h) ? h : 'start';
+  for (const name of VIEWS) $('#view-' + name).hidden = name !== v;
+  $$('.nav a').forEach(a => { if (a.getAttribute('href') === '#' + v) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  const active = $(`.nav a[href="#${v}"]`);
+  if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  if (currentView !== null && currentView !== v) window.scrollTo(0, 0);
+  currentView = v;
+  if (v === 'playground') Playground.ensure();
+  if (v === 'code') Walk.ensure();
+  if (v === 'quiz') Quiz.ensure();
+}
+window.addEventListener('hashchange', route);
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-scroll]');
+  if (!b) return;
+  const target = document.getElementById(b.dataset.scroll);
+  if (target) {
+    const y = target.getBoundingClientRect().top + window.scrollY - ($('.top').offsetHeight + 16);
+    window.scrollTo({ top: y, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+});
+
+/* ================= playground ================= */
+const EXAMPLES = [
+  { id: 'notes', name: "The notes' example (gives 62)", desc: 'The nested expression from the lecture notes. Small, so it is the best one to step through first.',
+    code: `(+  (+ 1 2)\n    (* 3 4)\n    (+ 5\n       (* 6 7)))` },
+  { id: 'block', name: 'Variables with set and block', desc: 'block runs each expression in order and returns the last one. set stores a variable in the globals dictionary.',
+    code: `(block\n    (set x (+ 1 4))\n    (* x 5)            ? 25, but block keeps going\n    (output (* x 100)) ? prints [500]\n)` },
+  { id: 'while', name: 'A while loop', desc: 'while keeps running its body until its test gives 0. Watch x change in the scope table.',
+    code: `(block\n    (set x 5)\n    (while (< x 10)\n        (block\n            (set x (+ 1 x))\n            (output x)\n        )\n    )\n)` },
+  { id: 'func', name: 'Defining and calling a function', desc: 'Defining f only stores it in the functions dictionary. Calling it creates a brand new local dictionary.',
+    code: `(block\n    (function f (x y)\n        (+ x y)\n    )\n    (f 2 3)\n)` },
+  { id: 'fact', name: 'Factorial (recursion)', desc: 'From lisp1.py. Each call to fact gets its own local n. Watch the call stack grow and shrink.',
+    code: `(block\n    (function fact (n)\n        (if (< n 2)\n            1\n            (* n (fact (- n 1)))\n        )\n    )\n    (fact 5)\n)` },
+  { id: 'fib', name: "Fibonacci (lecture's final test)", desc: "The exact program lecture used to test the finished interpreter. It takes a few thousand steps, so try the Next call and Next print buttons.",
+    code: `(block\n    (function fib (n)\n        (if (< n 2)\n            1\n            (+ (fib (- n 1))\n               (fib (- n 2))\n            )\n        )\n    )\n    (set x 0)\n    (while (< x 10)\n        (block\n            (output x (fib x))\n            (set  x (+ x 1))\n        )\n    )\n)` },
+];
+const QUIRKS = [
+  { title: 'if only trusts exactly 1', body: 'The evaluator checks condition == 1, so a test of 5 counts as false and the else branch runs.',
+    code: `(if 5 100 200)   ? gives 200, not 100` },
+  { title: 'while only stops on exactly 0', body: 'The loop checks condition == 0, so (while 5 ...) never stops. The playground halts it for you.',
+    code: `(block\n    (set n 3)\n    (while n          ? 3, 2, 1, 0: stops at 0\n        (set n (- n 1)))\n)` },
+  { title: 'Functions cannot see globals', body: 'A call gets a brand new dictionary holding only its parameters, so g is undefined inside f. This one ends in an error on purpose.',
+    code: `(block\n    (set g 10)\n    (function f (x)\n        (+ x g))      ? g is not in f's dictionary\n    (f 1)\n)` },
+  { title: 'Every command returns a value', body: 'set returns the value it stored, function and output return 0, and while returns its last body value.',
+    code: `(output (set a 7) (function h (q) q) (output 1))` },
+  { title: 'Division is integer division', body: 'There are only ints, so / uses Python floor division, //. Negative results round down.',
+    code: `(output (/ 7 2) (/ (- 0 7) 2))   ? [3, -4]` },
+  { title: 'Missing parenthesis', body: 'Parsing fails when it runs out of tokens before finding a ). Try fixing it.',
+    code: `(+ 1 (* 2 3)` },
+];
+
+const Playground = (() => {
+  let started = false, res = null, idx = 0, timer = null, treeMode = 'vis', tokMode = 'chips';
+  let lastIn = new Map(), lastOut = new Map(), computedTo = -1;
+  const SPEEDS = [['Slow', 700], ['Normal', 220], ['Fast', 60], ['Very fast', 8]];
+
+  function ensure() {
+    if (started) return;
+    started = true;
+    const sel = $('#example');
+    sel.innerHTML = EXAMPLES.map(e => `<option value="${e.id}">${esc(e.name)}</option>`).join('') + '<option value="custom" hidden>Your own code</option>';
+    sel.addEventListener('change', () => { const ex = EXAMPLES.find(e => e.id === sel.value); if (ex) load(ex.code, ex.desc, ex.id); });
+    $('#run').addEventListener('click', run);
+    const ta = $('#code');
+    ta.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run(); }
+      else if (e.key === 'Tab' && !e.shiftKey) {
+        e.preventDefault();
+        const s = ta.selectionStart, en = ta.selectionEnd;
+        ta.setRangeText('    ', s, en, 'end');
+      }
+    });
+    ta.addEventListener('input', () => { if (sel.value !== 'custom') { sel.value = 'custom'; $('#ex-desc').textContent = 'Your own program. Press Run to see it tokenized, parsed and evaluated.'; } store.set('code', ta.value); });
+    $('#tok-chips').addEventListener('click', () => { tokMode = 'chips'; renderTokens(); });
+    $('#tok-py').addEventListener('click', () => { tokMode = 'py'; renderTokens(); });
+    $('#tree-vis').addEventListener('click', () => { treeMode = 'vis'; renderTree(); setStep(idx); });
+    $('#tree-py').addEventListener('click', () => { treeMode = 'py'; renderTree(); });
+    $('#quirks').innerHTML = QUIRKS.map((q, i) => `<div class="quirk"><h4>${esc(q.title)}</h4><p class="muted">${esc(q.body)}</p><button class="btn" type="button" data-quirk="${i}">Load and run</button></div>`).join('');
+    $('#quirks').addEventListener('click', e => {
+      const b = e.target.closest('[data-quirk]'); if (!b) return;
+      const q = QUIRKS[+b.dataset.quirk];
+      load(q.code, q.title + '. ' + q.body, 'custom');
+      $('#code').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
+    const saved = store.get('code', null);
+    const first = EXAMPLES[0];
+    if (saved && !EXAMPLES.some(e => e.code === saved)) load(saved, 'Your program from last time.', 'custom');
+    else load(first.code, first.desc, first.id);
+  }
+
+  function load(code, desc, id) {
+    $('#code').value = code;
+    $('#example').value = id;
+    $('#ex-desc').textContent = desc;
+    run();
+  }
+
+  function run() {
+    stop();
+    res = L.run($('#code').value);
+    idx = 0; lastIn = new Map(); lastOut = new Map(); computedTo = -1;
+    renderResults(); renderTokens(); renderTree(); renderStepper();
+    if (res.events.length) setStep(0);
+  }
+
+  function nodeAt(path) {
+    if (!res || res.tree === null) return undefined;
+    return path.split('.').slice(1).reduce((n, i) => (n === undefined ? undefined : n[+i]), res.tree);
+  }
+  const short = (s, n = 56) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+  function renderResults() {
+    const box = $('#results');
+    let h = '';
+    if (res.outputs.length) {
+      h += `<div><span class="eyebrow">Printed by output</span></div><pre class="out-lines">${esc(res.outputs.join('\n'))}</pre>`;
+    } else if (!res.error) {
+      h += `<p class="hint">Nothing was printed. Use <code>(output ...)</code> to print values.</p>`;
+    }
+    if (res.error) {
+      const stageName = { tokenize: 'Step 1, tokenize', parse: 'Step 2, parse', evaluate: 'Step 3, evaluate' }[res.error.stage];
+      h += `<div class="err"><span class="eyebrow">Error during ${stageName}</span><span>${esc(res.error.message)}</span></div>`;
+    } else {
+      h += `<div class="result-line"><span class="eyebrow">Final result</span><span class="big-value">${res.value}</span></div>`;
+    }
+    if (res.tree !== null && res.steps) {
+      const g = '{' + res.globals.map(([k, v]) => `'${k}': ${v}`).join(', ') + '}';
+      const f = '{' + res.functions.map(([k, p]) => `'${k}': (${pyParms(p)}, ...)`).join(', ') + '}';
+      h += `<div><span class="eyebrow">globalVars at the end</span></div><pre class="kv">${esc(g)}</pre>`;
+      h += `<div><span class="eyebrow">functionsMap at the end</span></div><pre class="kv">${esc(f)}</pre>`;
+      h += `<p class="hint">${res.steps.toLocaleString()} calls to evaluate.</p>`;
+    }
+    box.innerHTML = h;
+  }
+  function pyParms(p) { // "(x y)" -> "['x', 'y']"
+    const inner = p.replace(/^\(|\)$/g, '').trim();
+    return '[' + (inner ? inner.split(/\s+/).map(x => /^\d+$/.test(x) ? x : `'${x}'`).join(', ') : '') + ']';
+  }
+
+  function renderTokens() {
+    $('#tok-chips').setAttribute('aria-pressed', tokMode === 'chips');
+    $('#tok-py').setAttribute('aria-pressed', tokMode === 'py');
+    const el = $('#tokens');
+    if (!res.tokens) { el.innerHTML = `<p class="hint">Tokenizing failed, so there are no tokens. See the error above.</p>`; $('#tok-count').textContent = ''; return; }
+    $('#tok-count').textContent = `${res.tokens.length} tokens`;
+    el.innerHTML = tokMode === 'chips' ? `<div class="tokens">${chips(res.tokens)}</div>` : `<pre class="kv">${esc(L.pyRepr(res.tokens))}</pre>`;
+  }
+
+  const ROLES = { set: ['name', 'value'], if: ['test', 'then', 'else'], while: ['test', 'body'], function: ['name', 'params', 'body'] };
+  function treeHTML(node, path, role) {
+    const r = role ? `<span class="role">${role}</span>` : '';
+    if (Array.isArray(node)) {
+      const cmd = node[0];
+      const roles = typeof cmd === 'string' ? ROLES[cmd] : null;
+      const kids = node.slice(1).map((c, i) => `<li>${treeHTML(c, path + '.' + (i + 1), roles ? roles[i] : '')}</li>`).join('');
+      return `<span class="tn list" data-path="${path}">${r}<span class="lp">(</span><span class="k">${esc(L.toLisp(cmd))}</span><span class="lp">${kids ? '' : ')'}</span><span class="val"></span></span>${kids ? `<ul>${kids}</ul>` : ''}`;
+    }
+    const cls = L.isInt(node) ? 'num' : 'name';
+    return `<span class="tn ${cls}" data-path="${path}">${r}<span class="k">${esc(L.toLisp(node))}</span><span class="val"></span></span>`;
+  }
+  function prettyPy(x, ind = 0) {
+    const flat = L.pyRepr(x);
+    if (!Array.isArray(x) || flat.length + ind <= 44) return flat;
+    const pad = ' '.repeat(ind + 4);
+    const kids = x.slice(1).map((c, i) => pad + prettyPy(c, ind + 4) + (i < x.length - 2 ? ',' : ''));
+    return '[' + L.pyRepr(x[0]) + ',\n' + kids.join('\n') + '\n' + ' '.repeat(ind) + ']';
+  }
+  function renderTree() {
+    $('#tree-vis').setAttribute('aria-pressed', treeMode === 'vis');
+    $('#tree-py').setAttribute('aria-pressed', treeMode === 'py');
+    const box = $('#tree-box');
+    if (res.tree === null) { box.innerHTML = `<p class="hint">Parsing did not finish, so there is no tree. See the error above.</p>`; return; }
+    box.innerHTML = treeMode === 'vis'
+      ? `<div class="tree"><ul><li>${treeHTML(res.tree, 'r', '')}</li></ul></div>`
+      : `<pre class="kv">${esc(prettyPy(res.tree))}</pre>`;
+  }
+
+  function renderStepper() {
+    const el = $('#stepper');
+    if (!res.events.length) {
+      el.innerHTML = `<p class="hint">${res.tree === null ? 'Evaluation never started because an earlier step failed.' : 'No steps recorded.'}</p>`;
+      return;
+    }
+    const n = res.events.length;
+    el.innerHTML = `
+      <div class="stepper" role="group" aria-label="Step controls">
+        <button class="btn icon" type="button" data-act="first" title="First step" aria-label="First step">|&lsaquo;</button>
+        <button class="btn icon" type="button" data-act="prev" title="Previous step" aria-label="Previous step">&lsaquo;</button>
+        <button class="btn" type="button" data-act="play" id="play">Play</button>
+        <button class="btn icon" type="button" data-act="next" title="Next step" aria-label="Next step">&rsaquo;</button>
+        <button class="btn icon" type="button" data-act="last" title="Last step" aria-label="Last step">&rsaquo;|</button>
+        <select id="speed" aria-label="Play speed">${SPEEDS.map(([nm, ms], i) => `<option value="${ms}" ${i === 1 ? 'selected' : ''}>${nm}</option>`).join('')}</select>
+      </div>
+      <div class="stepper">
+        <input type="range" id="scrub" min="0" max="${n - 1}" value="0" aria-label="Step">
+        <span class="step-count" id="step-count"></span>
+      </div>
+      <div class="stepper">
+        <button class="btn" type="button" data-act="call">Next call</button>
+        <button class="btn" type="button" data-act="print">Next print</button>
+        <button class="btn" type="button" data-act="back">Back out of this call</button>
+      </div>
+      ${res.truncated ? `<p class="hint">This program took more steps than the stepper keeps, so only the first ${n.toLocaleString()} are shown. The output and result above are complete.</p>` : ''}
+      <div class="now" id="now" aria-live="polite"></div>
+      <div class="scope-grid">
+        <div><span class="eyebrow">Current scope</span><div id="scope"></div></div>
+        <div><span class="eyebrow">Call stack (top is now)</span><div class="stack" id="stack"></div></div>
+      </div>
+      <div><span class="eyebrow">Recent steps</span><ol class="log" id="log"></ol></div>`;
+    el.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => act(b.dataset.act)));
+    $('#scrub').addEventListener('input', e => { stop(); setStep(+e.target.value); });
+    $('#speed').addEventListener('change', () => { if (timer) { stop(); play(); } });
+    $('#stepper-panel').addEventListener('keydown', e => {
+      if (e.target.matches('input, select')) return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); act('next'); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); act('prev'); }
+    });
+  }
+
+  function act(a) {
+    const ev = res.events, n = ev.length;
+    if (a === 'play') { timer ? stop() : play(); return; }
+    stop();
+    if (a === 'first') setStep(0);
+    else if (a === 'prev') setStep(idx - 1);
+    else if (a === 'next') setStep(idx + 1);
+    else if (a === 'last') setStep(n - 1);
+    else if (a === 'call') { const j = ev.findIndex((e, i) => i > idx && e.t === 'msg' && e.call); setStep(j < 0 ? n - 1 : j); }
+    else if (a === 'print') { const j = ev.findIndex((e, i) => i > idx && e.out); setStep(j < 0 ? n - 1 : j); }
+    else if (a === 'back') {
+      const depth = ev[idx].k.length;
+      const j = ev.findIndex((e, i) => i > idx && e.k.length < depth);
+      setStep(j < 0 ? n - 1 : j);
+    }
+  }
+  function play() {
+    if (idx >= res.events.length - 1) setStep(0);
+    $('#play').textContent = 'Pause';
+    timer = setInterval(() => {
+      if (idx >= res.events.length - 1) { stop(); return; }
+      setStep(idx + 1);
+    }, +$('#speed').value);
+  }
+  function stop() { if (timer) { clearInterval(timer); timer = null; } const p = $('#play'); if (p) p.textContent = 'Play'; }
+
+  function advanceTo(i) {
+    if (i < computedTo) { lastIn = new Map(); lastOut = new Map(); computedTo = -1; }
+    for (let j = computedTo + 1; j <= i; j++) {
+      const e = res.events[j];
+      if (e.t === 'in') lastIn.set(e.p, j);
+      else if (e.t === 'out') lastOut.set(e.p, j);
+    }
+    computedTo = i;
+  }
+
+  function describe(e) {
+    const node = nodeAt(e.p);
+    const src = node === undefined ? '' : short(L.toLisp(node));
+    if (e.t === 'in') {
+      if (L.isInt(node)) return ['NUMBER', `<code>${esc(src)}</code> is a number, so it evaluates to itself.`];
+      if (typeof node === 'string') return ['LOOK UP', `<code>${esc(src)}</code> is a variable, so look it up in the current scope's dictionary.`];
+      const cmd = node[0];
+      if (cmd === 'set' || cmd === 'if' || cmd === 'while' || cmd === 'function')
+        return ['EVALUATE', `Start evaluating <code>${esc(src)}</code>. <b>${esc(cmd)}</b> is a special form, so it decides which of its arguments to evaluate.`];
+      return ['EVALUATE', `Start evaluating <code>${esc(src)}</code>. First, evaluate each argument, left to right.`];
+    }
+    if (e.t === 'out') return ['VALUE', `<code>${esc(src)}</code> gave <b>${esc(e.v)}</b>.`];
+    if (e.call) return ['CALL', esc(e.text)];
+    if (e.out) return ['PRINT', esc(e.text)];
+    return ['NOTE', esc(e.text)];
+  }
+
+  function setStep(i) {
+    if (!res || !res.events.length) return;
+    const ev = res.events;
+    idx = Math.max(0, Math.min(ev.length - 1, i));
+    const e = ev[idx];
+    advanceTo(idx);
+    $('#scrub').value = idx;
+    $('#step-count').textContent = `step ${(idx + 1).toLocaleString()} of ${ev.length.toLocaleString()}`;
+    const [badge, what] = describe(e);
+    $('#now').innerHTML = `<span class="badge">${badge}</span><span class="what">${what}</span>`;
+    $('#scope').innerHTML = e.s.vars.length
+      ? `<table class="vars"><tbody>${e.s.vars.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</tbody></table>`
+      : `<p class="hint">${e.s.label === 'global' ? 'The globals dictionary is empty.' : 'This dictionary is empty.'}</p>`;
+    $('#stack').innerHTML = e.k.map(f => `<span>${esc(f)}</span>`).reverse().join('');
+    // recent log
+    const from = Math.max(0, idx - 14);
+    let rows = '';
+    for (let j = from; j <= idx; j++) {
+      const x = ev[j];
+      const node = nodeAt(x.p);
+      const pad = Math.min(x.d, 14) * 10;
+      let txt;
+      if (x.t === 'in') txt = `<span class="m">eval</span> ${esc(short(L.toLisp(node), 48))}`;
+      else if (x.t === 'out') txt = `${esc(short(L.toLisp(node), 36))} <span class="m">gave</span> <span class="v">${esc(x.v)}</span>`;
+      else txt = `<span class="m">${esc(x.text)}</span>`;
+      rows += `<li class="${j === idx ? 'cur' : ''}" style="padding-left:${6 + pad}px">${txt}</li>`;
+    }
+    const log = $('#log');
+    log.innerHTML = rows;
+    log.scrollTop = log.scrollHeight;
+    // tree highlights
+    if (treeMode === 'vis') {
+      const box = $('#tree-box');
+      let cur = null;
+      box.querySelectorAll('.tn').forEach(el => {
+        const p = el.dataset.path;
+        const li = lastIn.get(p) ?? -1, lo = lastOut.get(p) ?? -1;
+        const v = el.querySelector('.val');
+        el.classList.toggle('running', li > lo);
+        v.textContent = lo > li ? '= ' + ev[lo].v : (li > lo ? '…' : '');
+        const isCur = p === e.p;
+        el.classList.toggle('current', isCur);
+        if (isCur) cur = el;
+      });
+      if (cur) {
+        const br = box.getBoundingClientRect(), cr = cur.getBoundingClientRect();
+        if (cr.top < br.top + 8 || cr.bottom > br.bottom - 8) box.scrollTop += cr.top - br.top - box.clientHeight / 3;
+        if (cr.left < br.left || cr.right > br.right) box.scrollLeft += cr.left - br.left - 24;
+      }
+    }
+  }
+  return { ensure };
+})();
+
+/* ================= python walkthrough ================= */
+const Walk = (() => {
+  let done = false;
+  const KW = new Set('and as assert break class continue def del elif else except finally for from global if import in is lambda None nonlocal not or pass raise return True False try while with yield'.split(' '));
+  const BI = new Set('print len int str list dict tuple isinstance zip sum range repr chr Exception'.split(' '));
+  function highlight(src) {
+    const re = /('''[\s\S]*?'''|"""[\s\S]*?"""|f?'(?:\\.|[^'\\\n])*'|f?"(?:\\.|[^"\\\n])*"|#[^\n]*|\b\d+\b|\b[A-Za-z_]\w*\b)/g;
+    const parts = [];
+    let last = 0, m, prevWord = '';
+    while ((m = re.exec(src))) {
+      if (m.index > last) parts.push(['', src.slice(last, m.index)]);
+      const t = m[0];
+      let cls = '';
+      if (t.startsWith("'''") || t.startsWith('"""') || /^f?['"]/.test(t)) cls = 'st';
+      else if (t[0] === '#') cls = 'co';
+      else if (/^\d/.test(t)) cls = 'nu';
+      else if (KW.has(t)) cls = 'kw';
+      else if (prevWord === 'def' || prevWord === 'class') cls = 'fn';
+      else if (BI.has(t)) cls = 'bi';
+      if (/^[A-Za-z_]/.test(t) && !/^f?['"]/.test(t)) prevWord = t; else if (cls !== 'co') prevWord = '';
+      parts.push([cls, t]);
+      last = m.index + t.length;
+    }
+    if (last < src.length) parts.push(['', src.slice(last)]);
+    // split into lines without breaking spans
+    const lines = [''];
+    for (const [cls, text] of parts) {
+      text.split('\n').forEach((piece, i) => {
+        if (i > 0) lines.push('');
+        if (piece) lines[lines.length - 1] += cls ? `<span class="${cls}">${esc(piece)}</span>` : esc(piece);
+      });
+    }
+    return lines;
+  }
+  const NOTES = [
+    { title: 'Setup', body: `<p>The docstring describes the little language. Then three things every later step needs:</p><ul><li><code>EOF = chr(0)</code>, the end marker from the notes.</li><li><code>COMMENT_CHAR = '?'</code>, the same as lisp2.py.</li><li><code>LispError</code>, a custom exception so mistakes in the <i>Lisp</i> program are easy to tell apart from bugs in Python.</li></ul>` },
+    { title: 'Step 1: tokenize', body: `<p>One loop walks across the string with index <code>i</code>. Each branch handles one kind of character:</p><ul><li><b>Whitespace</b> and <b>comments</b> are skipped, which is how tokenizing removes them.</li><li>A <b>digit</b> starts a number. Keep reading digits, then convert the whole slice with <code>int()</code>.</li><li>A <b>letter</b> starts a name. Keep reading letters.</li><li><b>Punctuation</b> is always a single character token.</li><li>Anything else raises an <b>illegal character</b> error.</li></ul><p>The loop stops at the EOF marker, which is why lecture appended it. The result ends with EOF too.</p>` },
+    { title: 'Step 2: parse', body: `<p><code>parseExpression(tokens, i)</code> parses one expression that starts at <code>tokens[i]</code> and returns <b>two things</b>: the tree, and the index right after it.</p><ul><li>If the token is <code>(</code>, the next token is the command. Then it <b>calls itself</b> for each argument until it reaches <code>)</code>. That recursion is what handles any depth of nesting.</li><li>Otherwise the token is an int or a name, and it stands for itself.</li><li>Hitting EOF inside a list means a <code>)</code> is missing.</li></ul>` },
+    { title: 'Step 3: evaluate', body: `<p>Three cases, by the type of the tree:</p><ul><li><b>int</b>: return it.</li><li><b>str</b>: a variable. Look it up in <code>localVars</code>, the current dictionary.</li><li><b>list</b>: a command with arguments.</li></ul><p><b>Special forms come first.</b> <code>set</code>, <code>if</code>, <code>while</code> and <code>function</code> must control which arguments get evaluated: <code>if</code> runs only one branch, <code>set</code> must not look up the name it is setting, and <code>function</code> must not run its body yet.</p><p>Every other command evaluates <b>all</b> its arguments first, recursively, then acts on the values. A user defined call builds a <b>new dictionary</b> for its locals, exactly as the notes describe, then evaluates the stored body in it.</p>` },
+    { title: 'Math helpers', body: `<p>Each helper receives the already evaluated arguments as a list.</p><ul><li><code>/</code> uses <code>//</code>, integer division, because this Lisp only has ints.</li><li><code>&lt;</code> returns 1 or 0 instead of True or False, and checks that the whole list is strictly increasing, so <code>(&lt; 1 2 3)</code> is 1.</li></ul>` },
+    { title: 'Putting it together', body: `<p><code>run(code)</code> clears the dictionaries and chains the three steps: <code>evaluate(parse(tokenize(code)))</code>. That one line is the entire interpreter design.</p><p>Running the file directly runs the lecture's Fibonacci test, just like lisp2.py's demo at the bottom.</p>` },
+  ];
+  function ensure() {
+    if (done) return; done = true;
+    const src = JSON.parse($('#py-source').textContent);
+    const lines = highlight(src);
+    const raw = src.split('\n');
+    // split points: banner blocks ("# =====" followed by STEP/PUTTING) and the helpers comment
+    const cuts = [0];
+    raw.forEach((ln, i) => {
+      if (/^# =====/.test(ln) && /^# (STEP|PUTTING)/.test(raw[i + 1] || '')) cuts.push(i);
+      if (/^# Helpers for the math/.test(ln)) cuts.push(i);
+    });
+    cuts.push(raw.length);
+    let h = '';
+    for (let c = 0; c < cuts.length - 1; c++) {
+      let a = cuts[c], b = cuts[c + 1];
+      while (b > a && raw[b - 1].trim() === '') b--;
+      const body = lines.slice(a, b).map((l, k) => `<span class="ln" data-n="${a + k + 1}">${l || ' '}</span>`).join('');
+      const note = NOTES[c] || { title: '', body: '' };
+      h += `<div class="walk-row"><pre class="py" aria-label="minilisp.py lines ${a + 1} to ${b}">${body}</pre><div class="walk-notes"><span class="eyebrow">Lines ${a + 1} to ${b}</span><h3>${note.title}</h3>${note.body}</div></div>`;
+    }
+    $('#walk').innerHTML = h;
+  }
+  return { ensure };
+})();
+
+/* ================= quizzes ================= */
+const QUIZZES = {
+  robotics: [
+    { q: 'In the Sense, Think, Act paradigm, which step is loosely analogous to updating the model in MVC?', o: ['Act', 'Sense', 'Think', 'None of them'], a: 1,
+      why: 'Sensing gathers new information (environment, robot state, external commands) and stores it, which the notes compare to updating the model.' },
+    { q: 'Which step is loosely analogous to the controller?', o: ['Think', 'Sense', 'Act', 'All three equally'], a: 0,
+      why: 'Thinking draws conclusions or estimates from the model and plans an action, like a controller deciding what happens next.' },
+    { q: 'Which step is loosely analogous to the view?', o: ['Sense', 'Think', 'Act', 'Sense and Think together'], a: 2,
+      why: 'Acting produces the visible output: moving motors, sending messages, or controlling other outputs.' },
+    { q: 'Which is NOT one of the kinds of information the Sense step gathers, according to the notes?', o: ['The environment', "The robot's own state", 'External commands', 'The final plan of action'], a: 3,
+      why: 'Planning is part of Think. Sense covers the environment, robot state, and external commands.' },
+    { q: 'Industrial robots doing extremely fast, repetitive motions in predictable environments usually use:', o: ['Force control', 'Position control', 'Series elastic actuators', 'LLM based planning'], a: 1,
+      why: 'Position control shines when the environment is predictable and the same motion repeats very quickly.' },
+    { q: 'Older walking robots stayed stable by keeping their center of mass or zero moment point above what, at all times?', o: ['Their support polygon', 'Their battery', 'Their center of rotation', 'The nearest wall'], a: 0,
+      why: 'The support polygon is the area outlined by the parts touching the ground. Keeping the center of mass or ZMP above it prevents tipping.' },
+    { q: 'What was the typical downside of that older walking approach?', o: ['The robots fell over constantly', 'They were stable but slow, often stiff and toy like', 'They could not use position control', 'They needed LLMs to walk'], a: 1,
+      why: 'The notes describe these robots as stable but slow, often appearing stiff and toy like.' },
+    { q: 'What does force control allow robots to do?', o: ['Move faster in predictable factories', 'Operate more like humans, reacting to touch and recovering from unexpected collisions', 'Avoid needing any sensors', 'Remove all safety concerns'], a: 1,
+      why: 'Force control lets a robot feel and respond to contact, the way people react to touch and recover from bumps.' },
+    { q: 'According to the notes, which are better suited for precise force control than traditional geared motors?', o: ['Stepper motors with more gearing', 'Series elastic actuators and compliant joints', 'Hydraulic pistons only', 'Faster batteries'], a: 1,
+      why: 'Series elastic actuators and compliant joints make it possible to measure and control force precisely.' },
+    { q: 'What do more modern robots often use?', o: ['Very high torque direct drive motors with less gearing', 'Much more gearing on small motors', 'Only position control', 'Pneumatic muscles exclusively'], a: 0,
+      why: 'The notes say modern robots often use very high torque direct drive motors with less gearing.' },
+    { q: 'Before 2020, what was a barrier to building practical, agile humanoid robots?', o: ['Lack of programming languages', 'Battery and motor power density', 'Cost of cameras', 'Too much computing power'], a: 1,
+      why: 'Power density, meaning power per kilogram, was too low for batteries and motors before 2020.' },
+    { q: 'What limited the advancement of dynamic motion before the late 2010s?', o: ['Fast, reliable computing hardware and control algorithms', 'Lack of metal', 'Lack of research interest', 'The Sense, Think, Act paradigm'], a: 0,
+      why: 'Dynamic motion requires very fast, reliable computation and good control algorithms, which were limited until the late 2010s.' },
+    { q: 'True or false: compliant joints necessarily make collisions with humans safe.', o: ['True', 'False'], a: 1,
+      why: 'The notes say compliant joints do not necessarily reduce the danger of collisions with humans. Dynamic robots also often fail in unexpected ways.' },
+    { q: 'Which is NOT listed as a modern barrier in robotics?', o: ['Reliable environment perception and interpretation', 'Battery capacity for extended runtimes', 'Compact compute for on device planning with LLMs', 'A lack of strong enough motors to lift a robot'], a: 3,
+      why: 'The modern barriers are perception, battery capacity, and compact compute for on device LLM planning.' },
+  ],
+  interp: [
+    { q: 'Who invented Lisp, and when?', o: ['Guido van Rossum, 1991', 'John McCarthy at MIT, 1958', 'Alan Turing, 1936', 'Grace Hopper, 1959'], a: 1,
+      why: 'Lisp was invented by John McCarthy at MIT in 1958.' },
+    { q: 'Lisp is the second oldest programming language still in use. Which one is older?', o: ['COBOL', 'C', 'Fortran', 'Python'], a: 2,
+      why: 'Fortran is the only language still in use that is older than Lisp.' },
+    { q: 'What does (+ 1 2 3) evaluate to?', o: ['3', '123', '6', 'An error'], a: 2,
+      why: 'Prefix notation: the command + comes first and applies to all the arguments, 1 + 2 + 3 = 6.' },
+    { q: 'What does (* 2 (+ 3 4)) evaluate to?', o: ['10', '14', '24', '9'], a: 1,
+      why: 'Evaluate the inner expression first: (+ 3 4) is 7, then (* 2 7) is 14.' },
+    { q: 'What is the difference between an interpreter and a compiler?', o: ['An interpreter translates code to assembly. A compiler runs it directly.', 'An interpreter directly runs code. A compiler translates code into another language, such as assembly.', 'They are the same thing.', 'Interpreters only work for Lisp.'], a: 1,
+      why: 'An interpreter takes code as input and directly runs it. A compiler translates it into another language.' },
+    { q: 'In what order did the lecture interpreter work?', o: ['Parse, tokenize, evaluate', 'Evaluate, parse, tokenize', 'Tokenize, parse, evaluate', 'Tokenize, evaluate, parse'], a: 2,
+      why: 'Tokenize the string, parse the tokens into a tree, then evaluate the tree.' },
+    { q: 'What does tokenizing return?', o: ['A parse tree', 'A 1D list of tokens', 'The final answer', 'A dictionary of variables'], a: 1,
+      why: 'Tokenizing turns the code string into a flat, 1D list of tokens.' },
+    { q: 'At which step are whitespace and comments removed?', o: ['Tokenizing', 'Parsing', 'Evaluating', 'They are never removed'], a: 0,
+      why: 'The notes say tokenizing is where whitespace and comments are removed.' },
+    { q: 'Why did lecture use chr(0) as the EOF marker?', o: ['It is the fastest character', 'chr(0) cannot appear in the code, so it safely marks the end', 'Python requires it', 'It stands for zero errors'], a: 1,
+      why: 'EOF helps the tokenizer know where the input ends. chr(0) is safe because it cannot appear in real code.' },
+    { q: 'What are the tokens for (set x 12)?', o: ["['(', 'set', 'x', '12', ')', EOF]", "['(', 'set', 'x', 12, ')', EOF]", "['set', 'x', 12]", "['(set x 12)', EOF]"], a: 1, mono: true,
+      why: 'Each parenthesis and name is its own token, the number becomes a real int 12 (not the string "12"), and EOF is added at the end.' },
+    { q: 'What is the parse tree for (+ 1 (* 2 3))?', o: ["['+', 1, '*', 2, 3]", "['(', '+', 1, '(', '*', 2, 3, ')', ')']", "['+', 1, ['*', 2, 3]]", "[['+', 1], ['*', 2, 3]]"], a: 2, mono: true,
+      why: 'Each expression becomes a list. The inner expression is a list inside the outer list.' },
+    { q: 'Why did lecture use recursion for both parsing and evaluating?', o: ['Recursion is always faster than loops', 'Expressions can be arbitrarily nested', 'Python does not have while loops', 'To use less memory'], a: 1,
+      why: 'An expression can contain an expression which contains another, to any depth. Recursion handles that naturally.' },
+    { q: 'How did the interpreter handle local variables for a user defined function?', o: ['It stored them in the globals dictionary', 'It created a new dictionary just before calling the function', 'It did not support local variables', 'It stored them in the parse tree'], a: 1,
+      why: 'Just before calling a user defined function, the interpreter creates a new dictionary to hold its local variables.' },
+    { q: 'What did the functions dictionary map each function name to?', o: ['The function’s return value', 'A tuple of its parameter list and its body (a parse tree)', 'A string of its source code', 'The number of times it was called'], a: 1,
+      why: 'Function names mapped to (parameter list, body), for example {\'f\': ([\'x\', \'y\'], [\'+\', \'x\', \'y\'])}.' },
+    { q: 'Which is NOT one of the errors the notes say the interpreter raised exceptions for?', o: ['Illegal tokens', 'Undefined variables', 'Unknown commands', 'Code that runs too slowly'], a: 3,
+      why: 'The notes list illegal tokens, undefined variables, and unknown commands.' },
+    { q: 'Why is popping off the front of a list (pop(0)) inefficient?', o: ['It deletes the whole list', 'Every remaining item must shift left, so each pop is O(n)', 'It only works on strings', 'It is O(1), so it is not inefficient'], a: 1,
+      why: 'Removing the first item shifts all the others, which costs O(n) every time.' },
+    { q: 'Which is NOT one of the fixes the notes suggest for pop(0)?', o: ['Reverse the list and pop off the right side', 'Use a deque', 'Use indexes and never mutate the list', 'Sort the list first'], a: 3,
+      why: 'The three fixes are reversing and popping from the right, a deque, or indexes. Sorting would scramble the code.' },
+    { q: 'In the lecture’s fib test, what is printed when x is 4?', o: ['[4, 3]', '[4, 5]', '[4, 8]', '[5, 4]'], a: 1, mono: true,
+      why: 'This fib returns 1 when n < 2, so the values go 1, 1, 2, 3, 5. (output x (fib x)) prints [4, 5].' },
+    { q: 'Lecture used a block statement instead of which real Lisp command?', o: ['lambda', 'defun', 'progn', 'cond'], a: 2,
+      why: 'Lecture modified the language a bit, adding block instead of progn.' },
+  ],
+};
+// Same shuffled order every visit, so answers stay where you saw them.
+// True/False questions keep their natural order.
+function displayOrder(q, i) {
+  const order = q.o.map((_, j) => j);
+  if (q.o.length < 3) return order;
+  let seed = (i + 7) * 2654435761 % 4294967296;   // seed chosen so correct letters spread evenly
+  for (let k = order.length - 1; k > 0; k--) {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    const r = seed % (k + 1);
+    [order[k], order[r]] = [order[r], order[k]];
+  }
+  return order;
+}
+const Quiz = (() => {
+  let started = false, which = 'robotics', answers = {};
+  function ensure() {
+    if (started) return; started = true;
+    answers = store.get('quiz', { robotics: {}, interp: {} });
+    if (!answers.robotics) answers.robotics = {};
+    if (!answers.interp) answers.interp = {};
+    $$('[data-quiz]').forEach(b => b.addEventListener('click', () => { which = b.dataset.quiz; render(); }));
+    $('#quiz-reset').addEventListener('click', () => { answers[which] = {}; store.set('quiz', answers); render(); });
+    $('#qlist').addEventListener('click', e => {
+      const b = e.target.closest('.opt'); if (!b || b.disabled) return;
+      answers[which][b.dataset.q] = +b.dataset.o;
+      store.set('quiz', answers);
+      render(+b.dataset.q);
+    });
+    render();
+  }
+  function render(focusQ) {
+    $$('[data-quiz]').forEach(b => b.setAttribute('aria-pressed', b.dataset.quiz === which));
+    const qs = QUIZZES[which], ans = answers[which];
+    const letters = 'ABCD';
+    $('#qlist').innerHTML = qs.map((q, i) => {
+      const picked = ans[i];
+      const done = picked !== undefined;
+      const order = displayOrder(q, i);           // display position -> original option index
+      const opts = order.map((j, pos) => {
+        let cls = '';
+        if (done && j === q.a) cls = 'right';
+        else if (done && j === picked) cls = 'wrong';
+        const txt = q.mono ? `<code>${esc(q.o[j])}</code>` : esc(q.o[j]);
+        return `<button class="opt ${cls}" type="button" data-q="${i}" data-o="${j}" ${done ? 'disabled' : ''}><span class="l">${letters[pos]}</span><span>${txt}</span></button>`;
+      }).join('');
+      const rightLetter = letters[order.indexOf(q.a)];
+      const why = done ? `<div class="q-why"><b class="${picked === q.a ? 'ok' : 'no'}">${picked === q.a ? 'CORRECT' : 'NOT QUITE. THE ANSWER IS ' + rightLetter}</b><span>${esc(q.why)}</span></div>` : '';
+      return `<li class="q" id="q-${i}"><div class="q-prompt"><span>${esc(q.q)}</span></div><div class="q-opts">${opts}</div>${why}</li>`;
+    }).join('');
+    const answered = Object.keys(ans).length;
+    const right = Object.entries(ans).filter(([i, o]) => qs[+i].a === o).length;
+    $('#score').textContent = answered === qs.length
+      ? `Done: ${right} of ${qs.length} correct`
+      : `${right} correct out of ${answered} answered · ${qs.length - answered} left`;
+    if (focusQ !== undefined) { const el = $(`#q-${focusQ} .q-why`); if (el) el.setAttribute('tabindex', '-1'); }
+  }
+  return { ensure };
+})();
+
+route();
+})();
+</script>
+
+</body>
+</html>

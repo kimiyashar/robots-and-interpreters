@@ -1,0 +1,6 @@
+ref/
+tests/shots/
+__pycache__/
+*.zip
+.DS_Store
+robots-and-interpreters.html
